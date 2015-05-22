@@ -31,39 +31,57 @@ unsigned int current_millisecond()
 
 
 
-#define TEST_COUNT 100*1000
+#define TEST_COUNT 1*1000
 int main(int argc, char* argv[])
 {
 	unsigned int begin = current_millisecond();
 	int matching_count = 0;	
-	struct pattern_tree * head = NULL;
+	struct match_tree_head * head = NULL;
+	const char * filename = "sanguo_utf8.txt";
+	FILE * fp = NULL;
+	char * file_content1 = NULL;
+	unsigned int file_content1_len = 0;
+	char * file_content2 = NULL;
+	unsigned int file_content2_len = 0;
+	unsigned int i = 0;
+	unsigned int j = 0;
 #ifdef WIN32
-	char chatmsg1[100] = "abcdefg chat msg 周瑜笑了一声";
-	char chatmsg2[100] = "abcdefg chat msg 周瑜笑了一声";
+	if (fopen_s(&fp, filename, "rb") != 0)
+	{
+		return NULL;
+	}
 #else
-	char chatmsg1[100] = "abcdefg chat msg 周瑜笑了一声";
-	char chatmsg2[100] = "abcdefg chat msg 周瑜笑了一声";
+	fp = fopen(filename, "rb");
+	if (!fp)
+	{
+		return NULL;
+	}
 #endif
 
-	unsigned int msg_len = strlen(chatmsg1);
-	int i = 0;
-	int j = 0;
+	fseek(fp, 0, SEEK_END);
+	file_content1_len = ftell(fp);
+	if (file_content1_len == 0)
+	{
+		return -1;
+	}
+	file_content1 = (char*)malloc(file_content1_len + 1);
+	file_content2 = (char*)malloc(file_content1_len + 1);
+	file_content1[file_content1_len] = '\0';
+	fseek(fp, 0, SEEK_SET);
+	file_content1_len = fread(file_content1, 1, file_content1_len, fp);
+	fclose(fp);
+	fp = NULL;
+	memcpy(file_content2, file_content1, file_content1_len);
+	file_content2_len = file_content1_len;
 
-#ifdef WIN32
-	const char filename[] = "sanguo.txt";
-#else
-	const char filename[] = "sanguo_utf8.txt";
-#endif
-	
 
-	multi_mod_pattern_tree_from_file(&head, filename, ',');
-	
+	head = match_tree_init_from_file(filename, ",", 1);
 	begin = current_millisecond();
 	for (i = 0; i < TEST_COUNT; i++)
 	{
-		for (j = 0; j < msg_len; j++)
+		for (j = 0; j < file_content1_len; j++)
 		{
-			if (multi_mod_pattern_tree_matching(head, chatmsg1, msg_len - j, 1) > 0)
+			if (match_tree_matching(head, file_content1 + j, file_content1_len - j, 0) > 0)
 			{
 				matching_count++;
 			}
@@ -71,16 +89,19 @@ int main(int argc, char* argv[])
 	}
 	printf("matching tree used time = %d, matching count=%d\n", current_millisecond() - begin, matching_count);
 	
+	getchar();
+	//printf("string      will   translate  with  greedy[%s]\n", file_content1_len);
+	match_tree_translate(head, file_content1, file_content1_len, 1, '*');
+	printf("string    is already translate with greedy[%s]\n", file_content1);
 
-	printf("string      will   translate  with  greedy[%s]\n", chatmsg1);
-	multi_mod_pattern_tree_translate(head, chatmsg1, strlen(chatmsg1), 1, '*');
-	printf("string    is already translate with greedy[%s]\n", chatmsg1);
+	getchar();
+	getchar();
+	getchar();
+	//printf("string   will   translate  without  greedy[%s]\n", file_content2_len);
+	match_tree_translate(head, file_content2, file_content2_len, 0, '*');
+	printf("string is already translate without greedy[%s]\n", file_content2);
 
-	printf("string   will   translate  without  greedy[%s]\n", chatmsg2);
-	multi_mod_pattern_tree_translate(head, chatmsg2, strlen(chatmsg2), 0, '*');
-	printf("string is already translate without greedy[%s]\n", chatmsg2);
-
-	multi_mod_pattern_tree_free(&head);
+	match_tree_free(&head);
 	return 0;
 }
 
