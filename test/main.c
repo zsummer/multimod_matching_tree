@@ -6,7 +6,7 @@
 #include <windows.h>
 #endif
 
-#include "../multimod_matching_tree.h"
+#include "../match_tree.h"
 
 unsigned int current_millisecond()
 {

@@ -14,7 +14,7 @@
     <ClCompile Include="main.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\multimod_matching_tree.h" />
+    <ClInclude Include="..\match_tree.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{6B98CAD6-9E8E-42E8-A5CF-120CCF6AE293}</ProjectGuid>
