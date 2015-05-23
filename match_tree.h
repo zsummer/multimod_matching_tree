@@ -46,6 +46,7 @@ THE SOFTWARE.
 #include <string.h>
 
 /*
+data structure:
   [head]
 	©À©¤©¤ [node0]
 	©À©¤©¤ [node1]
