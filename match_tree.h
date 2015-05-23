@@ -214,30 +214,19 @@ static struct match_tree_head * match_tree_init_from_file(const char * file_name
 
 	fseek(fp, 0, SEEK_END);
 	file_content_len = ftell(fp);
-	file_content = (char*)malloc(file_content_len + 1);
-	file_content[file_content_len] = '\0';
+	file_content = (char*)malloc(file_content_len + delimiter_len+ 1);
 	fseek(fp, 0, SEEK_SET);
 	file_content_len = fread(file_content, 1, file_content_len, fp);
 	fclose(fp);
 	fp = NULL;
+	memcpy(file_content + file_content_len, delimiter, delimiter_len);
+	file_content[file_content_len + delimiter_len] = '\0';
+	file_content_len += delimiter_len;
 	head = match_tree_init();
-
-	//delete file BOM head
-	if (file_content_len >= 3 
-		&& (unsigned char)file_content[0] == 0xef 
-		&& (unsigned char)file_content[1] == 0xbb 
-		&& (unsigned char)file_content[2] == 0xbf)
-	{
-		pattern = file_content+3;
-		i = 3;
-	}
-	else
-	{
-		pattern = file_content;
-		i = 0;
-	}
-	
-	while ( i + delimiter_len < file_content_len)
+	//printf("%s:%d", file_content, file_content_len);
+	pattern = file_content;
+	i = 0;
+	while ( i + delimiter_len <= file_content_len)
 	{
 		is_delimiter = 1;
 		for (j = 0; j < delimiter_len; j++)
@@ -254,7 +243,7 @@ static struct match_tree_head * match_tree_init_from_file(const char * file_name
 			pattern_len = file_content + i - pattern;
 			match_tree_add_pattern(head, pattern, pattern_len);
 			i = i + delimiter_len;
-			pattern = file_content + i + delimiter_len;
+			pattern = file_content + i;
 		}
 		else
 		{

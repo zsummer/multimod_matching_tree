@@ -24,21 +24,20 @@ unsigned int current_millisecond()
 	struct timeval tm;
 	gettimeofday(&tm, NULL);
 	now = tm.tv_sec * 1000;
-	now += tm.tv_usec;
+	now += tm.tv_usec/1000;
 #endif
 	return (unsigned int)now;
 }
 
 
 
-#define TEST_COUNT 1*1000
+#define TEST_COUNT 100*1000
 int main(int argc, char* argv[])
 {
-	const char a[] = "123";
-	unsigned int begin = current_millisecond();
+	unsigned int begin = 0;
 	int matching_count = 0;	
 	struct match_tree_head * head = NULL;
-	const char * filename = "sanguo_utf8.txt";
+	const char * filename = "filter.txt";
 	FILE * fp = NULL;
 	char * file_content1 = NULL;
 	unsigned int file_content1_len = 0;
@@ -49,13 +48,13 @@ int main(int argc, char* argv[])
 #ifdef WIN32
 	if (fopen_s(&fp, filename, "rb") != 0)
 	{
-		return NULL;
+		return -1;
 	}
 #else
 	fp = fopen(filename, "rb");
 	if (!fp)
 	{
-		return NULL;
+		return -1;
 	}
 #endif
 
@@ -76,7 +75,7 @@ int main(int argc, char* argv[])
 	file_content2_len = file_content1_len;
 
 
-	head = match_tree_init_from_file(filename, ",", 1);
+	head = match_tree_init_from_file(filename, ".....", 5);
 	begin = current_millisecond();
 	for (i = 0; i < TEST_COUNT; i++)
 	{
@@ -90,17 +89,15 @@ int main(int argc, char* argv[])
 	}
 	printf("matching tree used time = %d, matching count=%d\n", current_millisecond() - begin, matching_count);
 	
-	getchar();
-	//printf("string      will   translate  with  greedy[%s]\n", file_content1_len);
-	match_tree_translate(head, file_content1, file_content1_len, 1, '*');
-	printf("string    is already translate with greedy[%s]\n", file_content1);
 
-	getchar();
-	getchar();
-	getchar();
-	//printf("string   will   translate  without  greedy[%s]\n", file_content2_len);
+	printf("string      will   translate  with  greedy[%s]\n\n", file_content1);
+	match_tree_translate(head, file_content1, file_content1_len, 1, '*');
+	printf("string    is already translate with greedy[%s]\n\n", file_content1);
+
+
+	printf("string   will   translate  without  greedy[%s]\n\n", file_content2);
 	match_tree_translate(head, file_content2, file_content2_len, 0, '*');
-	printf("string is already translate without greedy[%s]\n", file_content2);
+	printf("string is already translate without greedy[%s]\n\n", file_content2);
 
 	match_tree_free(&head);
 	return 0;
