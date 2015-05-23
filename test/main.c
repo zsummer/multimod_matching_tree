@@ -31,13 +31,14 @@ unsigned int current_millisecond()
 
 
 
-#define TEST_COUNT 100*1000
+#define TEST_COUNT 10*1000
 int main(int argc, char* argv[])
 {
 	unsigned int begin = 0;
 	int matching_count = 0;	
 	struct match_tree_head * head = NULL;
-	const char * filename = "filter.txt";
+//	const char * filename = "filter.txt";
+	const char * filename = "filterworlds.txt";
 	FILE * fp = NULL;
 	char * file_content1 = NULL;
 	unsigned int file_content1_len = 0;
@@ -68,7 +69,7 @@ int main(int argc, char* argv[])
 	file_content2 = (char*)malloc(file_content1_len + 1);
 	file_content1[file_content1_len] = '\0';
 	fseek(fp, 0, SEEK_SET);
-	file_content1_len = fread(file_content1, 1, file_content1_len, fp);
+	file_content1_len = (unsigned int)fread(file_content1, 1, file_content1_len, fp);
 	fclose(fp);
 	fp = NULL;
 	memcpy(file_content2, file_content1, file_content1_len);
