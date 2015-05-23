@@ -34,6 +34,7 @@ unsigned int current_millisecond()
 #define TEST_COUNT 1*1000
 int main(int argc, char* argv[])
 {
+	const char a[] = "123";
 	unsigned int begin = current_millisecond();
 	int matching_count = 0;	
 	struct match_tree_head * head = NULL;

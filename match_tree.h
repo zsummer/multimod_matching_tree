@@ -46,10 +46,50 @@ THE SOFTWARE.
 #include <string.h>
 
 /*
+  [head]
+	©À©¤©¤ [node0]
+	©À©¤©¤ [node1]
+	©À©¤©¤ [node2]
+	©À©¤©¤ [node3]
+	©¦        ©À©¤©¤ [node0]
+	©¦        ©À©¤©¤ [node1]
+	©¦        ©À©¤©¤ [node2]
+	©¦        ©À©¤©¤ [node3]
+	©¦        ©¦        ©À©¤©¤ [node0]
+	©¦        ©¦        ©À©¤©¤ [node...]
+	©¦        ©¦        ©¸©¤©¤ [node255]
+	©¦        ©À©¤©¤ [node...]
+	©¦        ©À©¤©¤ [node253]
+	©¦        ©À©¤©¤ [node254]
+	©¦        ©¸©¤©¤ [node255]
+	©À©¤©¤ [node...]
+	©À©¤©¤ [node254]
+	©¸©¤©¤ [node255]
+
+example:
+	patterns is:
+		string "123" ==> 0x31 0x32 0x33 ==> 49 50 51
+		string "132" ==> 0x31 0x33 0x32 ==> 49 51 50
+		string "1234" ==> 0x31 0x32 0x33 0x34 ==> 49 50 51 52
+
+		the build tree like this:
+		[head]
+		©¸©¤©¤ [node49]{_is_used = true,_is_boundary=false}
+		©À©¤©¤ [node50]{_is_used = true,_is_boundary=false}
+		©¦        ©¸©¤©¤ [node51]{_is_used = true,_is_boundary=true}
+		©¦		          ©¸©¤©¤ [node52]{_is_used = true,_is_boundary=true}
+		©¦
+		©¸©¤©¤ [node51]{_is_used = true,_is_boundary=false}
+		©¸©¤©¤ [node50]{_is_used = true,_is_boundary=true}
+
+	when use method "match_tree_matching" matching from text or biniry stream example "12345":
+		be greedy: return 4;
+		not greedy: return 3;
+
 */
 struct match_tree_node 
 {
-	unsigned char _is_valid_node;
+	unsigned char _is_used;
 	unsigned char _is_boundary;
 	struct match_tree_node * _child_tree; //match_tree_node[256]
 };
@@ -63,13 +103,23 @@ struct match_tree_head
 	unsigned int _tree_node_minimum_len;
 };
 
+//build one multi-pattern match tree
 static struct match_tree_head * match_tree_init();
-static int match_tree_add_pattern(struct match_tree_head * head, const char * pattern, unsigned int pattern_len, unsigned char level);
+//add one pattern to the tree.
+static int match_tree_add_pattern(struct match_tree_head * head, const char * pattern, unsigned int pattern_len);
+//build and add patterns from file.
 static struct match_tree_head * match_tree_init_from_file(const char * file_name, const char* delimiter, unsigned int delimiter_len);
-
+//matching pattern from text or biniry stream.
 static unsigned int match_tree_matching(const struct match_tree_head *head, const char * text, unsigned int text_len, unsigned char is_greedy);
+//translate character when the character is matched.
 static void match_tree_translate(const struct match_tree_head *head, char * text, unsigned int text_len, unsigned char is_greedy, char escape);
+//free one multi-pattern match tree
 static void match_tree_free(struct match_tree_head **head);
+
+
+//--------------------------------------
+//impliment
+//--------------------------------------
 
 static struct match_tree_head * match_tree_init()
 {
@@ -78,7 +128,7 @@ static struct match_tree_head * match_tree_init()
 	return head;
 }
 
-static int match_tree_add_pattern(struct match_tree_head * head, const char * pattern, unsigned int pattern_len, unsigned char level)
+static int match_tree_add_pattern(struct match_tree_head * head, const char * pattern, unsigned int pattern_len)
 {
 	struct match_tree_node **tree = NULL;
 	unsigned int i = 0;
@@ -104,8 +154,12 @@ static int match_tree_add_pattern(struct match_tree_head * head, const char * pa
 		}
 		
 		node = (unsigned char)pattern[i];
+
 		//set node valid, default is invalid
-		(*tree)[node]._is_valid_node = 1;
+		if (!(*tree)[node]._is_used)
+		{
+			(*tree)[node]._is_used = 1;
+		}
 
 		//check is the boundary, if true then set bound.
 		if (i == pattern_len - 1 && !(*tree)[node]._is_boundary)
@@ -198,7 +252,7 @@ static struct match_tree_head * match_tree_init_from_file(const char * file_name
 		if (is_delimiter)
 		{
 			pattern_len = file_content + i - pattern;
-			match_tree_add_pattern(head, pattern, pattern_len, 0);
+			match_tree_add_pattern(head, pattern, pattern_len);
 			i = i + delimiter_len;
 			pattern = file_content + i + delimiter_len;
 		}
@@ -228,7 +282,7 @@ static unsigned int match_tree_matching(const struct match_tree_head *head, cons
 	for (i = 0; i < text_len; ++i)
 	{
 		node = (unsigned char)text[i];
-		if (tree == NULL || !tree[node]._is_valid_node)
+		if (tree == NULL || !tree[node]._is_used)
 		{
 			break;
 		}
