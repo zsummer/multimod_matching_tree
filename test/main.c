@@ -99,7 +99,8 @@ int main(int argc, char* argv[])
 	match_tree_translate(head, file_content2, file_content2_len, 0, '*');
 	printf("string is already translate without greedy[%s]\n\n", file_content2);
 
-	match_tree_free(&head);
+	match_tree_free(head);
+	head = NULL;
 	return 0;
 }
 
