@@ -37,8 +37,8 @@ int main(int argc, char* argv[])
 	unsigned int begin = 0;
 	int matching_count = 0;	
 	struct match_tree_head * head = NULL;
-//	const char * filename = "filter.txt";
-	const char * filename = "filterworlds.txt";
+	const char * filename = "filter.txt";
+//	const char * filename = "filterworlds.txt";
 	FILE * fp = NULL;
 	char * file_content1 = NULL;
 	unsigned int file_content1_len = 0;

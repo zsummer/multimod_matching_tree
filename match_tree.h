@@ -1,4 +1,4 @@
-
+ï»¿
 /*
 
 multimod_matching_tree License
@@ -48,24 +48,24 @@ THE SOFTWARE.
 /*
 data structure:
   [head]
-	©À©¤©¤ [node0]
-	©À©¤©¤ [node1]
-	©À©¤©¤ [node2]
-	©À©¤©¤ [node3]
-	©¦        ©À©¤©¤ [node0]
-	©¦        ©À©¤©¤ [node1]
-	©¦        ©À©¤©¤ [node2]
-	©¦        ©À©¤©¤ [node3]
-	©¦        ©¦        ©À©¤©¤ [node0]
-	©¦        ©¦        ©À©¤©¤ [node...]
-	©¦        ©¦        ©¸©¤©¤ [node255]
-	©¦        ©À©¤©¤ [node...]
-	©¦        ©À©¤©¤ [node253]
-	©¦        ©À©¤©¤ [node254]
-	©¦        ©¸©¤©¤ [node255]
-	©À©¤©¤ [node...]
-	©À©¤©¤ [node254]
-	©¸©¤©¤ [node255]
+	â”œâ”€â”€ [node0]
+	â”œâ”€â”€ [node1]
+	â”œâ”€â”€ [node2]
+	â”œâ”€â”€ [node3]
+	â”‚        â”œâ”€â”€ [node0]
+	â”‚        â”œâ”€â”€ [node1]
+	â”‚        â”œâ”€â”€ [node2]
+	â”‚        â”œâ”€â”€ [node3]
+	â”‚        â”‚        â”œâ”€â”€ [node0]
+	â”‚        â”‚        â”œâ”€â”€ [node...]
+	â”‚        â”‚        â””â”€â”€ [node255]
+	â”‚        â”œâ”€â”€ [node...]
+	â”‚        â”œâ”€â”€ [node253]
+	â”‚        â”œâ”€â”€ [node254]
+	â”‚        â””â”€â”€ [node255]
+	â”œâ”€â”€ [node...]
+	â”œâ”€â”€ [node254]
+	â””â”€â”€ [node255]
 
 example:
 	patterns is:
@@ -75,13 +75,13 @@ example:
 
 		the build tree like this:
 		[head]
-		©¸©¤©¤ [node49]{_is_used = true,_is_boundary=false}
-		©À©¤©¤ [node50]{_is_used = true,_is_boundary=false}
-		©¦        ©¸©¤©¤ [node51]{_is_used = true,_is_boundary=true}
-		©¦		          ©¸©¤©¤ [node52]{_is_used = true,_is_boundary=true}
-		©¦
-		©¸©¤©¤ [node51]{_is_used = true,_is_boundary=false}
-		©¸©¤©¤ [node50]{_is_used = true,_is_boundary=true}
+		â””â”€â”€ [node49]{_is_used = true,_is_boundary=false}
+		â”œâ”€â”€ [node50]{_is_used = true,_is_boundary=false}
+		â”‚        â””â”€â”€ [node51]{_is_used = true,_is_boundary=true}
+		â”‚		          â””â”€â”€ [node52]{_is_used = true,_is_boundary=true}
+		â”‚
+		â””â”€â”€ [node51]{_is_used = true,_is_boundary=false}
+		â””â”€â”€ [node50]{_is_used = true,_is_boundary=true}
 
 	when use method "match_tree_matching" matching from text or biniry stream example "12345":
 		be greedy: return 4;
