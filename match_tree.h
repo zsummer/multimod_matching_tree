@@ -5,13 +5,13 @@ multimod_matching_tree License
 -----------
 
 multimod_matching_tree is licensed under the terms of the MIT license reproduced below.
-This means that Log4z is free software and can be used for both academic
+This means that multimod_matching_tree is free software and can be used for both academic
 and commercial purposes at absolutely no cost.
 
 
 ===============================================================================
 
-Copyright (C) 2014-2015 YaweiZhang <yawei.zhang@foxmail.com>.
+Copyright (C) 2014-2016 YaweiZhang <yawei.zhang@foxmail.com>.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -107,31 +107,31 @@ struct match_tree_head
 };
 
 //build one multi-pattern match tree
-static struct match_tree_head * match_tree_init();
+struct match_tree_head * match_tree_init();
 //add one pattern to the tree.
 static int match_tree_add_pattern(struct match_tree_head * head, const char * pattern, unsigned int pattern_len);
 //build and add patterns from file.
-static struct match_tree_head * match_tree_init_from_file(const char * file_name, const char* delimiter, unsigned int delimiter_len);
+struct match_tree_head * match_tree_init_from_file(const char * file_name, const char* delimiter, unsigned int delimiter_len);
 //matching pattern from text or biniry stream.
-static unsigned int match_tree_matching(const struct match_tree_head *head, const char * text, unsigned int text_len, unsigned char is_greedy);
+unsigned int match_tree_matching(const struct match_tree_head *head, const char * text, unsigned int text_len, unsigned char is_greedy);
 //translate character when the character is matched.
-static void match_tree_translate(const struct match_tree_head *head, char * text, unsigned int text_len, unsigned char is_greedy, char escape);
+void match_tree_translate(const struct match_tree_head *head, char * text, unsigned int text_len, unsigned char is_greedy, char escape);
 //free one multi-pattern match tree
-static void match_tree_free(struct match_tree_head *head);
+void match_tree_free(struct match_tree_head *head);
 
 
 //--------------------------------------
 //impliment
 //--------------------------------------
 
-static struct match_tree_head * match_tree_init()
+struct match_tree_head * match_tree_init()
 {
     struct match_tree_head * head = (struct match_tree_head *)malloc(sizeof(struct match_tree_head));
     memset(head, 0, sizeof(struct match_tree_head));
     return head;
 }
 
-static int match_tree_add_pattern(struct match_tree_head * head, const char * pattern, unsigned int pattern_len)
+int match_tree_add_pattern(struct match_tree_head * head, const char * pattern, unsigned int pattern_len)
 {
     struct match_tree_node **tree = NULL;
     unsigned int i = 0;
@@ -186,7 +186,7 @@ static int match_tree_add_pattern(struct match_tree_head * head, const char * pa
     return 0;
 }
 
-static struct match_tree_head * match_tree_init_from_file(const char * file_name, const char * delimiter, unsigned int delimiter_len)
+struct match_tree_head * match_tree_init_from_file(const char * file_name, const char * delimiter, unsigned int delimiter_len)
 {
     FILE * fp = NULL;
     char * file_content = NULL;
@@ -263,7 +263,7 @@ static struct match_tree_head * match_tree_init_from_file(const char * file_name
     return head;
 }
 
-static unsigned int match_tree_matching(const struct match_tree_head *head, const char * text, unsigned int text_len, unsigned char is_greedy)
+unsigned int match_tree_matching(const struct match_tree_head *head, const char * text, unsigned int text_len, unsigned char is_greedy)
 {
     unsigned int ret_len = 0;
     unsigned int i = 0;
@@ -295,7 +295,7 @@ static unsigned int match_tree_matching(const struct match_tree_head *head, cons
     return ret_len;
 }
 
-static void match_tree_translate(const struct match_tree_head *head, char * text, unsigned int text_len, unsigned char is_greedy, char escape)
+void match_tree_translate(const struct match_tree_head *head, char * text, unsigned int text_len, unsigned char is_greedy, char escape)
 {
     unsigned int matching_count = 0;
     unsigned int i = 0;
@@ -318,7 +318,7 @@ static void match_tree_translate(const struct match_tree_head *head, char * text
     }
 }
 
-static void __match_tree_free(struct match_tree_node *tree)
+void __match_tree_free(struct match_tree_node *tree)
 {
     unsigned int i = 0;
     if (tree->_child_tree)
@@ -333,7 +333,7 @@ static void __match_tree_free(struct match_tree_node *tree)
         free(tree->_child_tree);
     }
 }
-static void match_tree_free(struct match_tree_head *head)
+void match_tree_free(struct match_tree_head *head)
 {
     if (head == NULL)
     {
