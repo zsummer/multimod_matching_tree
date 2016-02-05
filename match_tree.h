@@ -106,32 +106,38 @@ struct match_tree_head
     unsigned int _tree_pattern_minimum_len;
 };
 
+#if __GNUC__
+#define MMT_API static __attribute((unused))
+#else
+#define MMT_API static
+#endif
+
 //build one multi-pattern match tree
-struct match_tree_head * match_tree_init();
+MMT_API struct match_tree_head * match_tree_init();
 //add one pattern to the tree.
-static int match_tree_add_pattern(struct match_tree_head * head, const char * pattern, unsigned int pattern_len);
+MMT_API int match_tree_add_pattern(struct match_tree_head * head, const char * pattern, unsigned int pattern_len);
 //build and add patterns from file.
-struct match_tree_head * match_tree_init_from_file(const char * file_name, const char* delimiter, unsigned int delimiter_len);
+MMT_API struct match_tree_head * match_tree_init_from_file(const char * file_name, const char* delimiter, unsigned int delimiter_len);
 //matching pattern from text or biniry stream.
-unsigned int match_tree_matching(const struct match_tree_head *head, const char * text, unsigned int text_len, unsigned char is_greedy);
+MMT_API unsigned int match_tree_matching(const struct match_tree_head *head, const char * text, unsigned int text_len, unsigned char is_greedy);
 //translate character when the character is matched.
-void match_tree_translate(const struct match_tree_head *head, char * text, unsigned int text_len, unsigned char is_greedy, char escape);
+MMT_API void match_tree_translate(const struct match_tree_head *head, char * text, unsigned int text_len, unsigned char is_greedy, char escape);
 //free one multi-pattern match tree
-void match_tree_free(struct match_tree_head *head);
+MMT_API void match_tree_free(struct match_tree_head *head);
 
 
 //--------------------------------------
 //impliment
 //--------------------------------------
 
-struct match_tree_head * match_tree_init()
+MMT_API struct match_tree_head * match_tree_init()
 {
     struct match_tree_head * head = (struct match_tree_head *)malloc(sizeof(struct match_tree_head));
     memset(head, 0, sizeof(struct match_tree_head));
     return head;
 }
 
-int match_tree_add_pattern(struct match_tree_head * head, const char * pattern, unsigned int pattern_len)
+MMT_API int match_tree_add_pattern(struct match_tree_head * head, const char * pattern, unsigned int pattern_len)
 {
     struct match_tree_node **tree = NULL;
     unsigned int i = 0;
@@ -186,7 +192,7 @@ int match_tree_add_pattern(struct match_tree_head * head, const char * pattern, 
     return 0;
 }
 
-struct match_tree_head * match_tree_init_from_file(const char * file_name, const char * delimiter, unsigned int delimiter_len)
+MMT_API struct match_tree_head * match_tree_init_from_file(const char * file_name, const char * delimiter, unsigned int delimiter_len)
 {
     FILE * fp = NULL;
     char * file_content = NULL;
@@ -263,7 +269,7 @@ struct match_tree_head * match_tree_init_from_file(const char * file_name, const
     return head;
 }
 
-unsigned int match_tree_matching(const struct match_tree_head *head, const char * text, unsigned int text_len, unsigned char is_greedy)
+MMT_API unsigned int match_tree_matching(const struct match_tree_head *head, const char * text, unsigned int text_len, unsigned char is_greedy)
 {
     unsigned int ret_len = 0;
     unsigned int i = 0;
@@ -295,7 +301,7 @@ unsigned int match_tree_matching(const struct match_tree_head *head, const char 
     return ret_len;
 }
 
-void match_tree_translate(const struct match_tree_head *head, char * text, unsigned int text_len, unsigned char is_greedy, char escape)
+MMT_API void match_tree_translate(const struct match_tree_head *head, char * text, unsigned int text_len, unsigned char is_greedy, char escape)
 {
     unsigned int matching_count = 0;
     unsigned int i = 0;
@@ -318,7 +324,7 @@ void match_tree_translate(const struct match_tree_head *head, char * text, unsig
     }
 }
 
-void __match_tree_free(struct match_tree_node *tree)
+MMT_API void __match_tree_free(struct match_tree_node *tree)
 {
     unsigned int i = 0;
     if (tree->_child_tree)
@@ -333,18 +339,18 @@ void __match_tree_free(struct match_tree_node *tree)
         free(tree->_child_tree);
     }
 }
-void match_tree_free(struct match_tree_head *head)
-{
-    if (head == NULL)
-    {
-        return;
-    }
-    if (head->_tree)
-    {
-        __match_tree_free(head->_tree);
-    }
-    free(head->_tree);
-}
+MMT_API void match_tree_free(struct match_tree_head *head)
+{ 
+    if (head)
+    { 
+        if (head->_tree) 
+        { 
+            __match_tree_free(head->_tree); 
+    	    free(head->_tree); 
+    	} 
+        free(head); 
+    } 
+} 
 
 
 
