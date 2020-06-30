@@ -8,7 +8,7 @@
 #include <sys/time.h>
 #endif
 
-#include "../match_tree.h"
+#include "match_tree.h"
 
 unsigned int current_millisecond()
 {

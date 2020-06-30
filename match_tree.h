@@ -75,13 +75,13 @@ example:
 
         the build tree like this:
         [head]
-        ├── [node49]{_is_used = true,_is_boundary=false}
-        ├── [node50]{_is_used = true,_is_boundary=false}
-        │        └── [node51]{_is_used = true,_is_boundary=true}
-        │                  └── [node52]{_is_used = true,_is_boundary=true}
+        ├── [node49]{is_used_ = true,is_boundary_=false}
+        ├── [node50]{is_used_ = true,is_boundary_=false}
+        │        └── [node51]{is_used_ = true,is_boundary_=true}
+        │                  └── [node52]{is_used_ = true,is_boundary_=true}
         │
-        ├── [node51]{_is_used = true,_is_boundary=false}
-        └── [node50]{_is_used = true,_is_boundary=true}
+        ├── [node51]{is_used_ = true,is_boundary_=false}
+        └── [node50]{is_used_ = true,is_boundary_=true}
 
     when use method "match_tree_matching" matching from text or biniry stream example "12345":
         be greedy: return 4;
@@ -90,20 +90,20 @@ example:
 */
 struct match_tree_node 
 {
-    unsigned char _is_used;
-    unsigned char _is_boundary;
-    struct match_tree_node * _child_tree; //match_tree_node[256]
+    unsigned char is_used_;
+    unsigned char is_boundary_;
+    struct match_tree_node * child_tree_; //match_tree_node[256]
 };
 
 struct match_tree_head
 {
-    struct match_tree_node * _tree;
-    unsigned int _tree_memory_used;
-    unsigned int _tree_node_total_count;
-    unsigned int _tree_node_used_count;
-    unsigned int _tree_pattern_count;
-    unsigned int _tree_pattern_maximum_len;
-    unsigned int _tree_pattern_minimum_len;
+    struct match_tree_node * tree_;
+    unsigned int tree_memory_used_;
+    unsigned int tree_node_total_count_;
+    unsigned int tree_node_used_count_;
+    unsigned int tree_pattern_count_;
+    unsigned int tree_pattern_maximum_len_;
+    unsigned int tree_pattern_minimum_len_;
 };
 
 #if __GNUC__
@@ -147,7 +147,7 @@ MMT_API int match_tree_add_pattern(struct match_tree_head * head, const char * p
     {
         return -1;
     }
-    tree = &head->_tree;
+    tree = &head->tree_;
     if (pattern_len == 0)
     {
         return 0;
@@ -159,35 +159,35 @@ MMT_API int match_tree_add_pattern(struct match_tree_head * head, const char * p
         {
             *tree = (struct match_tree_node *)malloc(sizeof(struct match_tree_node) * 256);
             memset(*tree, 0, sizeof(struct match_tree_node) * 256);
-            head->_tree_node_total_count += 256;
-            head->_tree_memory_used += sizeof(struct match_tree_node) * 256;
+            head->tree_node_total_count_ += 256;
+            head->tree_memory_used_ += sizeof(struct match_tree_node) * 256;
         }
         
         node = (unsigned char)pattern[i];
 
         //set node valid, default is invalid
-        if (!(*tree)[node]._is_used)
+        if (!(*tree)[node].is_used_)
         {
-            (*tree)[node]._is_used = 1;
-            head->_tree_node_used_count++;
+            (*tree)[node].is_used_ = 1;
+            head->tree_node_used_count_++;
         }
 
         //check is the boundary, if true then set bound.
-        if (i == pattern_len - 1 && !(*tree)[node]._is_boundary)
+        if (i == pattern_len - 1 && !(*tree)[node].is_boundary_)
         {
-            (*tree)[node]._is_boundary = 1;
-            head->_tree_pattern_count++;
+            (*tree)[node].is_boundary_ = 1;
+            head->tree_pattern_count_++;
 
-            if (pattern_len > head->_tree_pattern_maximum_len)
+            if (pattern_len > head->tree_pattern_maximum_len_)
             {
-                head->_tree_pattern_maximum_len = pattern_len;
+                head->tree_pattern_maximum_len_ = pattern_len;
             }
-            if (pattern_len < head->_tree_pattern_minimum_len || head->_tree_pattern_minimum_len == 0)
+            if (pattern_len < head->tree_pattern_minimum_len_ || head->tree_pattern_minimum_len_ == 0)
             {
-                head->_tree_pattern_minimum_len = pattern_len;
+                head->tree_pattern_minimum_len_ = pattern_len;
             }
         }
-        tree = &(*tree)[node]._child_tree;
+        tree = &(*tree)[node].child_tree_;
     }
     return 0;
 }
@@ -279,16 +279,16 @@ MMT_API unsigned int match_tree_matching(const struct match_tree_head *head, con
     {
         return ret_len;
     }
-    tree = head->_tree;
+    tree = head->tree_;
     for (i = 0; i < text_len; ++i)
     {
         node = (unsigned char)text[i];
-        if (tree == NULL || !tree[node]._is_used)
+        if (tree == NULL || !tree[node].is_used_)
         {
             break;
         }
         
-        if (tree[node]._is_boundary)
+        if (tree[node].is_boundary_)
         {
             ret_len = i+1;
             if (!is_greedy)
@@ -296,7 +296,7 @@ MMT_API unsigned int match_tree_matching(const struct match_tree_head *head, con
                 break;
             }
         }
-        tree = tree[node]._child_tree;
+        tree = tree[node].child_tree_;
     }
     return ret_len;
 }
@@ -324,29 +324,29 @@ MMT_API void match_tree_translate(const struct match_tree_head *head, char * tex
     }
 }
 
-MMT_API void __match_tree_free(struct match_tree_node *tree)
+MMT_API void match_tree_free_impl(struct match_tree_node *tree)
 {
     unsigned int i = 0;
-    if (tree->_child_tree)
+    if (tree->child_tree_)
     {
         for (i = 0; i < 256; i++)
         {
-            if (tree->_child_tree[i]._child_tree)
+            if (tree->child_tree_[i].child_tree_)
             {
-                __match_tree_free(&tree->_child_tree[i]);
+                match_tree_free_impl(&tree->child_tree_[i]);
             }
         }
-        free(tree->_child_tree);
+        free(tree->child_tree_);
     }
 }
 MMT_API void match_tree_free(struct match_tree_head *head)
 { 
     if (head)
     { 
-        if (head->_tree) 
+        if (head->tree_) 
         { 
-            __match_tree_free(head->_tree); 
-    	    free(head->_tree); 
+            match_tree_free_impl(head->tree_); 
+    	    free(head->tree_); 
     	} 
         free(head); 
     } 
