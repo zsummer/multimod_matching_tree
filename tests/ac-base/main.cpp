@@ -2,13 +2,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "fn_log.h"
 #ifdef WIN32
 #include <windows.h>
 #else
 #include <sys/time.h>
 #endif
 
-#include "match_tree.h"
+#include "ac_match_tree.h"
 
 
 unsigned int current_millisecond()
@@ -37,6 +38,8 @@ unsigned int current_millisecond()
 #define TEST_COUNT 10*1000
 int main(int argc, char* argv[])
 {
+	FNLog::FastStartDebugLogger();
+	LogDebug() << "start log";
 	unsigned int begin = 0;
 	int matching_count = 0;	
 	struct match_tree_head * head = NULL;
