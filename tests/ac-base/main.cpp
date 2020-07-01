@@ -82,32 +82,6 @@ int main(int argc, char* argv[])
 	file_content2_len = file_content1_len;
 
 
-	head = match_tree_init_from_file(filename, ".....", 5);
-	begin = current_millisecond();
-	for (i = 0; i < TEST_COUNT; i++)
-	{
-		for (j = 0; j < file_content1_len; j++)
-		{
-			if (match_tree_matching(head, file_content1 + j, file_content1_len - j, 0) > 0)
-			{
-				matching_count++;
-			}
-		}
-	}
-
-	printf("matching tree used time = %d, matching count=%d\n", current_millisecond() - begin, matching_count);
-	
-
-	printf("string      will   translate  with  greedy[%s]\n\n", file_content1);
-	match_tree_translate(head, file_content1, file_content1_len, 1, '*');
-	printf("string    is already translate with greedy[%s]\n\n", file_content1);
-
-
-	printf("string   will   translate  without  greedy[%s]\n\n", file_content2);
-	match_tree_translate(head, file_content2, file_content2_len, 0, '*');
-	printf("string is already translate without greedy[%s]\n\n", file_content2);
-
-	match_tree_free(head);
 	head = NULL;
 	return 0;
 }

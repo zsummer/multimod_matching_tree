@@ -116,7 +116,7 @@ FOREACH(SUB_DIR ${SUB_DIRS})
     ${CMAKE_SOURCE_DIR}/tests/${SUB_DIR}/*.c 
     ${CMAKE_SOURCE_DIR}/tests/${SUB_DIR}/*.cc 
     ${CMAKE_SOURCE_DIR}/tests/${SUB_DIR}/*.cpp)
-    LIST(APPEND EXAMPLE_SOURCE ${CMAKE_SOURCE_DIR}/match_tree.h ${CMAKE_SOURCE_DIR}/tests/fn_log.h)
+    LIST(APPEND EXAMPLE_SOURCE ${CMAKE_SOURCE_DIR}/match_tree.h ${CMAKE_SOURCE_DIR}/ac_match_tree.h ${CMAKE_SOURCE_DIR}/tests/fn_log.h)
     GROUP_SRC_BY_DIR(EXAMPLE_SOURCE)
     message(${EXAMPLE_SOURCE})
     ADD_EXECUTABLE(${SUB_DIR}  ${EXAMPLE_SOURCE})
