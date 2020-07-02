@@ -8,8 +8,21 @@
 #else
 #include <sys/time.h>
 #endif
-
+#define USED_FN_LOG
 #include "ac_match_tree.h"
+
+using namespace zsummer::matching;
+
+#define AssertMatch(val1, val2, desc)  \
+{\
+	auto v1 = val1;\
+	auto v2 = val2;\
+	if (v1 != v2)\
+	{\
+		LogError() << desc << " expr " << v1 << " not equal " << v2;\
+		return -1;\
+	}\
+}
 
 
 unsigned int current_millisecond()
@@ -33,56 +46,124 @@ unsigned int current_millisecond()
 	return (unsigned int)now;
 }
 
+s32 SimpleTest()
+{
+	MatchTree<int> tree;
+	s32 ret = tree.AddPatternFromString("1234, 12345, 155555, 23456, 188888, 8888", ',');
+	if (ret != 0)
+	{
+		LogError() << "error";
+		return -1;
+	}
+	if (tree.node_count_ != 24)
+	{
+		LogError() << " node count error";
+		return -2;
+	}
+	ret = tree.BuildBadState();
+	if (ret != 0)
+	{
+		LogError() << "error build goto";
+		return -5;
+	}
+	MatchNode<int>* node = tree.MatchPath("1", 1);
+	AssertMatch(node == NULL, false, "");
+	AssertMatch(node->goto_content_forward_, 1, "");
+	AssertMatch(node->got_content_match_offset_, 0, "");
 
+	node = tree.MatchPath("1234", 4);
+	MatchNode<int>* goto_node = tree.MatchPath("234", 3);
+	AssertMatch(node == NULL, false, "");
+	AssertMatch(goto_node == NULL, false, "");
+
+	AssertMatch(node->goto_node_, goto_node, "");
+
+	AssertMatch(tree.MatchPath("123", 3)->goto_node_, tree.MatchPath("23", 2), "");
+	AssertMatch(tree.MatchPath("123", 3)->got_content_match_offset_, 2, "");
+	AssertMatch(tree.MatchPath("123", 3)->goto_content_forward_, 1, "");
+
+	AssertMatch(tree.MatchPath("1555", 4)->goto_node_, &tree.root_, "");
+	AssertMatch(tree.MatchPath("1555", 4)->got_content_match_offset_, 0, "");
+	AssertMatch(tree.MatchPath("1555", 4)->goto_content_forward_, 4, "");
+
+	AssertMatch(tree.MatchPath("155", 3)->goto_node_, &tree.root_, "");
+	AssertMatch(tree.MatchPath("155", 3)->got_content_match_offset_, 0, "");
+	AssertMatch(tree.MatchPath("155", 3)->goto_content_forward_, 3, "");
+
+	AssertMatch(tree.MatchPath("15", 2)->goto_node_, &tree.root_, "");
+	AssertMatch(tree.MatchPath("15", 2)->got_content_match_offset_, 0, "");
+
+	
+	std::string content = "1234567";
+
+	MatchState<int> ms;
+	ms.offset_.begin_ = content.c_str();
+	ms.offset_.end_ = ms.offset_.begin_ + content.length();
+	ms.offset_.offset_ = ms.offset_.begin_;
+	ms.results_.clear();
+
+	MatchState<int> ms2 = ms;
+	ret = tree.MatchContent(ms);
+	AssertMatch(ret, 0, "");
+	ret = tree.AcMatchContent(ms2);
+	AssertMatch(ret, 0, "");
+	AssertMatch(ms.results_.size(), ms2.results_.size(), "");
+	AssertMatch(ms.results_.size(), 1, "");
+
+
+	content = "18888";
+	ms.offset_.begin_ = content.c_str();
+	ms.offset_.end_ = ms.offset_.begin_ + content.length();
+	ms.offset_.offset_ = ms.offset_.begin_;
+	ms.results_.clear();
+
+	ms2 = ms;
+	ret = tree.MatchContent(ms);
+	AssertMatch(ret, 0, "");
+	ret = tree.AcMatchContent(ms2);
+	AssertMatch(ret, 0, "");
+	AssertMatch(ms.results_.size(), ms2.results_.size(), "");
+	AssertMatch(ms.results_.size(), 1, "");
+	AssertMatch(ms.results_[0].offset_ - ms.results_[0].begin_, 4, "");
+	AssertMatch(std::string(ms.results_[0].begin_, ms.results_[0].offset_ - ms.results_[0].begin_), "8888", "");
+
+
+	ret = tree.DestroyPatternTree();
+	if (ret != 0)
+	{
+		LogError() << "error destroy";
+		return -10;
+	}
+	return 0;
+}
 
 #define TEST_COUNT 10*1000
 int main(int argc, char* argv[])
 {
 	FNLog::FastStartDebugLogger();
 	LogDebug() << "start log";
-	unsigned int begin = 0;
-	int matching_count = 0;	
-	struct match_tree_head * head = NULL;
-	const char * filename = "filter.txt";
-//	const char * filename = "filterworlds.txt";
-	FILE * fp = NULL;
-	char * file_content1 = NULL;
-	unsigned int file_content1_len = 0;
-	char * file_content2 = NULL;
-	unsigned int file_content2_len = 0;
-	unsigned int i = 0;
-	unsigned int j = 0;
-#ifdef WIN32
-	if (fopen_s(&fp, filename, "rb") != 0)
+
+	if (SimpleTest() != 0)
 	{
+		LogError() << "simple test error.";
 		return -1;
 	}
-#else
-	fp = fopen(filename, "rb");
-	if (!fp)
+	return 0;
+	MatchTree<int> tree;
+	std::string result = tree.ReadFile("filter.txt");
+	//std::string result = tree.ReadFile("filterworlds.txt");
+	if (result.empty())
 	{
+		LogError() << "open failed";
 		return -1;
 	}
-#endif
+	s32 ret = tree.AddPatternFromString(result.c_str(), ',');
+	
+	tree.BuildBadState();
 
-	fseek(fp, 0, SEEK_END);
-	file_content1_len = ftell(fp);
-	if (file_content1_len == 0)
-	{
-		return -1;
-	}
-	file_content1 = (char*)malloc(file_content1_len + 1);
-	file_content2 = (char*)malloc(file_content1_len + 1);
-	file_content1[file_content1_len] = '\0';
-	fseek(fp, 0, SEEK_SET);
-	file_content1_len = (unsigned int)fread(file_content1, 1, file_content1_len, fp);
-	fclose(fp);
-	fp = NULL;
-	memcpy(file_content2, file_content1, file_content1_len);
-	file_content2_len = file_content1_len;
+	ret |= tree.DestroyPatternTree();
 
 
-	head = NULL;
 	return 0;
 }
 
