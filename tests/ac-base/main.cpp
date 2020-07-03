@@ -24,27 +24,7 @@ using namespace zsummer::matching;
 	}\
 }
 
-
-unsigned int current_millisecond()
-{
-	unsigned long long now = 0;
-#ifdef WIN32
-	FILETIME ft;
-	GetSystemTimeAsFileTime(&ft);
-	now = ft.dwHighDateTime;
-	now <<= 32;
-	now |= ft.dwLowDateTime;
-	now /= 10;
-	now -= 11644473600000000ULL;
-	now /= 1000;
-#else
-	struct timeval tm;
-	gettimeofday(&tm, NULL);
-	now = tm.tv_sec * 1000;
-	now += tm.tv_usec/1000;
-#endif
-	return (unsigned int)now;
-}
+#define Now() std::chrono::duration<double>(std::chrono::system_clock().now().time_since_epoch()).count()                                
 
 s32 SimpleTest()
 {
@@ -60,7 +40,7 @@ s32 SimpleTest()
 		LogError() << " node count error";
 		return -2;
 	}
-	ret = tree.BuildBadState();
+	ret = tree.BuildGotoStateRecursive();
 	if (ret != 0)
 	{
 		LogError() << "error build goto";
@@ -69,7 +49,7 @@ s32 SimpleTest()
 	MatchNode<int>* node = tree.MatchPath("1", 1);
 	AssertMatch(node == NULL, false, "");
 	AssertMatch(node->goto_content_forward_, 1, "");
-	AssertMatch(node->got_content_match_offset_, 0, "");
+	AssertMatch(node->goto_content_match_offset_, 0, "");
 
 	node = tree.MatchPath("1234", 4);
 	MatchNode<int>* goto_node = tree.MatchPath("234", 3);
@@ -79,19 +59,19 @@ s32 SimpleTest()
 	AssertMatch(node->goto_node_, goto_node, "");
 
 	AssertMatch(tree.MatchPath("123", 3)->goto_node_, tree.MatchPath("23", 2), "");
-	AssertMatch(tree.MatchPath("123", 3)->got_content_match_offset_, 2, "");
+	AssertMatch(tree.MatchPath("123", 3)->goto_content_match_offset_, 2, "");
 	AssertMatch(tree.MatchPath("123", 3)->goto_content_forward_, 1, "");
 
 	AssertMatch(tree.MatchPath("1555", 4)->goto_node_, &tree.root_, "");
-	AssertMatch(tree.MatchPath("1555", 4)->got_content_match_offset_, 0, "");
+	AssertMatch(tree.MatchPath("1555", 4)->goto_content_match_offset_, 0, "");
 	AssertMatch(tree.MatchPath("1555", 4)->goto_content_forward_, 4, "");
 
 	AssertMatch(tree.MatchPath("155", 3)->goto_node_, &tree.root_, "");
-	AssertMatch(tree.MatchPath("155", 3)->got_content_match_offset_, 0, "");
+	AssertMatch(tree.MatchPath("155", 3)->goto_content_match_offset_, 0, "");
 	AssertMatch(tree.MatchPath("155", 3)->goto_content_forward_, 3, "");
 
 	AssertMatch(tree.MatchPath("15", 2)->goto_node_, &tree.root_, "");
-	AssertMatch(tree.MatchPath("15", 2)->got_content_match_offset_, 0, "");
+	AssertMatch(tree.MatchPath("15", 2)->goto_content_match_offset_, 0, "");
 
 	
 	std::string content = "1234567";
@@ -148,21 +128,121 @@ int main(int argc, char* argv[])
 		LogError() << "simple test error.";
 		return -1;
 	}
-	return 0;
-	MatchTree<int> tree;
-	std::string result = tree.ReadFile("filter.txt");
-	//std::string result = tree.ReadFile("filterworlds.txt");
-	if (result.empty())
+	LogInfo() << "simple test success.";
+
+	double now = 0.0;
+	std::string filterworlds = MatchTree<int>::ReadFile("filterworlds.txt");
+	now = Now();
+	if (true)
 	{
-		LogError() << "open failed";
-		return -1;
+		MatchTree<int> tree;
+		s32 ret = tree.AddPatternFromString(filterworlds.c_str(), ',');
+		ret |= tree.DestroyPatternTree();
+		if (ret != 0)
+		{
+			LogError() << "has error";
+		}
 	}
-	s32 ret = tree.AddPatternFromString(result.c_str(), ',');
-	
-	tree.BuildBadState();
+	LogInfo() << "build & destroy used:" << Now() - now;
+	now = Now();
+	if (true)
+	{
+		MatchTree<int> tree;
+		s32 ret = tree.AddPatternFromString(filterworlds.c_str(), ',');
+		ret |= tree.BuildGotoStateRecursive();
+		ret |= tree.DestroyPatternTree();
+		if (ret != 0)
+		{
+			LogError() << "has error";
+		}
+	}
+	LogInfo() << "build & goto state & destroy used:" << Now() - now;
 
-	ret |= tree.DestroyPatternTree();
+	std::string content = filterworlds;
+	for (size_t i = 0; i < content.size(); i++)
+	{
+		if (rand() % 3 == 0)
+		{
+			content[i] = 'a' + (rand() % 25);
+		}
+		if (content[i] == ',' ||content[i] ==' ' || content[i] == '.')
+		{
+			content[i] = 'a' + (rand() % 25);
+		}
+	}
+	LogDebug() << content;
+	now = Now();
+	if (true)
+	{
+		MatchTree<int> tree;
+		s32 ret = tree.AddPatternFromString(filterworlds.c_str(), ',');
+		MatchTree<int>::State state;
+		state.offset_.begin_ = content.c_str();
+		state.offset_.end_ = content.c_str() + content.length();
+		state.offset_.offset_ = state.offset_.begin_;
+		state.offset_.node_ = &tree.root_;
+		ret |= tree.MatchContent(state);
+		std::string str;
+		for (auto& s : state.results_)
+		{
+			str += std::string(s.begin_, s.offset_ - s.begin_) + " ";
+		}
+		LogDebug() << "match results:" << state.results_.size() << "\n" << str;
+		for (size_t i = 0; i < 1000; i++)
+		{
+			MatchTree<int>::State state;
+			state.offset_.begin_ = content.c_str();
+			state.offset_.end_ = content.c_str() + content.length();
+			state.offset_.offset_ = state.offset_.begin_;
+			state.offset_.node_ = &tree.root_;
+			state.results_.clear();
+			ret |= tree.MatchContent(state);
+		}
+		ret |= tree.DestroyPatternTree();
+		if (ret != 0)
+		{
+			LogError() << "has error";
+		}
+	}
+	LogInfo() << "build & match & destroy used:" << Now() - now;
+	now = Now();
+	if (true)
+	{
+		MatchTree<int> tree;
+		s32 ret = tree.AddPatternFromString(filterworlds.c_str(), ',');
+		ret |= tree.BuildGotoStateRecursive();
+		MatchTree<int>::State state;
+		state.offset_.begin_ = content.c_str();
+		state.offset_.end_ = content.c_str() + content.length();
+		state.offset_.offset_ = state.offset_.begin_;
+		state.offset_.node_ = &tree.root_;
+		ret |= tree.AcMatchContent(state);	
+		std::string str;
+		for (auto& s : state.results_)
+		{
+			str += std::string(s.begin_, s.offset_ - s.begin_) + " ";
+		}
+		LogDebug() << "match results:" << state.results_.size() << "\n" << str;
 
+		for (size_t i = 0; i < 1000; i++)
+		{
+			MatchTree<int>::State state;
+			state.offset_.begin_ = content.c_str();
+			state.offset_.end_ = content.c_str() + content.length();
+			state.offset_.offset_ = state.offset_.begin_;
+			state.offset_.node_ = &tree.root_;
+			state.results_.clear();
+			ret |= tree.AcMatchContent(state);
+		}
+
+		ret |= tree.DestroyPatternTree();
+		if (ret != 0)
+		{
+			LogError() << "has error";
+		}
+
+	}
+	LogInfo() << "build & goto state & ac_match & destroy used:" << Now() - now;
 
 	return 0;
 }
