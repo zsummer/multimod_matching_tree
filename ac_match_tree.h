@@ -72,15 +72,14 @@ namespace zsummer
         {
             bool has_val_;
             char node_char_;
-            s32 depth_;
+            s32 depth_; //root == 0  
             s32 childs_;
             MatchNode* parent_;
-            MatchNode* next_;
-            MatchNode* up_matched_; //跳转到目标后要设置最佳匹配
-            MatchNode* goto_node_; //失败后跳转到的目标node   
+            MatchNode* next_alloc_;
+            MatchNode* up_matched_; //最大匹配
+            MatchNode* goto_node_;  //失败后跳转到的目标node   
             s32 goto_content_forward_; //失败后跳转到目标node后, content开始指针滑动字符个数   
-            s32 goto_content_match_offset_;  //失败后跳转到目标node后, node所在的depth, 等同已匹配个数  
-            s32 goto_locked_path_; //发生失配  
+            s32 goto_locked_path_;      //发生失配后锁定第一个匹配位
             Ty val_;
             struct MatchNode* child_tree_[CHILD_SIZE];
             static_assert(std::is_arithmetic<Ty>::value, "");
@@ -111,17 +110,17 @@ namespace zsummer
             using Offset = MatchOffset<Ty>;
             using State = MatchState<Ty>;
             Node root_;
-            unsigned int use_heap_size_;
-            unsigned int node_count_;
-            unsigned int pattern_count_;
-            unsigned int pattern_max_len_;
-            unsigned int pattern_min_len_;
+            s32 use_heap_size_;
+            s32 node_count_;
+            s32 pattern_count_;
+            s32 pattern_max_len_;
+            s32 pattern_min_len_;
         public:
             MatchTree()
             {
                 memset(this, 0, sizeof(MatchTree));
             }
-            s32 AddPattern(const char* pattern, u32 pattern_len, Ty val);
+            s32 AddPattern(const char* pattern, s32 pattern_len, Ty val);
 
             s32 DestroyPatternTree();
 
@@ -134,10 +133,11 @@ namespace zsummer
 
             Node* MatchPath(const char* content, size_t len);
 
+            s32 BuildUpMatchedRecursive(Node*);
 
-            s32 BuildGotoStateRecursive(Node*);
+            s32 BuildGotoStateRecursive(Node*, std::string& path);
             s32 BuildGotoStateRecursive();
-            s32 BuildGotoState();
+
 
             static std::string ReadFile(const std::string& file_name);
 
@@ -147,7 +147,7 @@ namespace zsummer
         };
 
         template<class Ty>
-        s32 MatchTree<Ty>::AddPattern(const char* pattern, u32 pattern_len, Ty val)
+        s32 MatchTree<Ty>::AddPattern(const char* pattern, s32 pattern_len, Ty val)
         {
             //LogDebug() << "pattern<" << pattern_len << ">:[" << std::string(pattern, pattern_len) << "]";
             Node* node = &root_;
@@ -161,8 +161,8 @@ namespace zsummer
                     child = new Node();
                     memset(child, 0, sizeof(Node));
                     node->childs_++;
-                    child->next_ = root_.next_;
-                    root_.next_ = child;
+                    child->next_alloc_ = root_.next_alloc_;
+                    root_.next_alloc_ = child;
                     child->parent_ = node;
                     child->depth_ = node->depth_ + 1;
                     child->node_char_ = (char)*offset;
@@ -186,12 +186,12 @@ namespace zsummer
         template<class Ty>
         s32 MatchTree<Ty>::DestroyPatternTree()
         {
-            Node* node = root_.next_;
+            Node* node = root_.next_alloc_;
             s32 count = 0;
             while (node != NULL)
             {
                 Node* front = node;
-                node = node->next_;
+                node = node->next_alloc_;
                 delete front;
                 count++;
             }
@@ -260,7 +260,7 @@ namespace zsummer
                 if (enable_goto)
                 {
                     offset.begin_ += offset.node_->goto_content_forward_;
-                    offset.offset_ = offset.begin_ + offset.node_->goto_content_match_offset_;
+                    offset.offset_ = offset.begin_ + offset.node_->goto_node_->depth_;
                     offset.node_ = offset.node_->goto_node_;
                 }
                 else
@@ -304,24 +304,43 @@ namespace zsummer
             }
             return state.offset_.node_;
         }
+
         template<class Ty>
-        s32 MatchTree<Ty>::BuildGotoStateRecursive(Node*node)
+        s32 MatchTree<Ty>::BuildUpMatchedRecursive(Node* node)
+        {
+            if (node->has_val_)
+            {
+                node->up_matched_ = node;
+            }
+            else
+            {
+                node->up_matched_ = (node->parent_) ? node->parent_->up_matched_ : NULL;
+            }
+            for (size_t i = 0; i < CHILD_SIZE; i++)
+            {
+                if (node->child_tree_[i] != NULL)
+                {
+                    s32 ret = BuildUpMatchedRecursive(node->child_tree_[i]);
+                    if (ret != 0)
+                    {
+                        LogError() << "has error";
+                        return ret;
+                    }
+                }
+            }
+            return 0;
+        }
+
+        template<class Ty>
+        s32 MatchTree<Ty>::BuildGotoStateRecursive(Node*node, std::string& path)
         {
             if (node->depth_ > 0)
             {
                 node->goto_content_forward_ = node->parent_->goto_content_forward_;
-                node->goto_content_match_offset_ = node->parent_->goto_content_match_offset_;
                 node->goto_node_ = node->parent_->goto_node_;
                 node->goto_locked_path_ = node->parent_->goto_locked_path_;
-                if (node->has_val_)
-                {
-                    node->up_matched_ = node;
-                }
-                else
-                {
-                    node->up_matched_ = node->parent_->up_matched_;
-                }
             }
+
             //root & root->child  is direct pointer to root_ and forward offset 1.  
             if (node->depth_ > 1)
             {
@@ -330,7 +349,6 @@ namespace zsummer
                     //has match   
                     if (node->goto_node_->child_tree_[(u8)node->node_char_] != NULL)
                     {
-                        node->goto_content_match_offset_++;
                         node->goto_node_ = node->goto_node_->child_tree_[(u8)node->node_char_];
                     }
                     //first mis match
@@ -338,12 +356,52 @@ namespace zsummer
                     {
                         node->goto_content_forward_++;
                     }
-                    else //已匹配部分节点 定义失配并锁定 
+                    else //部分匹配后失配
                     {
-                        node->goto_locked_path_ = true;
-                        //goto目标node到root之间的路径如果存在完整匹配 则回溯并锁定到该位置
-                        //如果不存在匹配, 则进行begin滑动再次匹配 发现任何匹配均锁定位置, 
-                        //如果不存在任何匹配, 则跳转到最新的位置 
+                        //有完整匹配则锁定
+                        if (node->goto_node_->up_matched_)
+                        {
+                            node->goto_locked_path_ = true;
+                        }
+                        //无完整匹配则滑动一次进行查找
+                        else
+                        {
+                            while (++node->goto_content_forward_ != node->depth_)
+                            {
+                                State state;
+                                state.offset_.begin_ = path.c_str() + node->goto_content_forward_;
+                                state.offset_.offset_ = state.offset_.begin_;
+                                state.offset_.end_ = path.c_str() + path.length();
+                                state.offset_.node_ = &root_;
+                                s32 ret = MatchPath(state);
+                                if (ret != 0)
+                                {
+                                    LogError() << "match path error";
+                                    node->goto_locked_path_ = true;
+                                    node->goto_content_forward_ = 1;
+                                    node->goto_node_ = &root_;
+                                    break;
+                                }
+                                //出现超过当前节点的匹配则从该位置继续匹配
+                                if (state.offset_.node_->depth_ == node->depth_ - node->goto_content_forward_)
+                                {
+                                    node->goto_node_ = state.offset_.node_;
+                                    break;
+                                }
+                                //新位置仍然失配 但是存在完整匹配 锁定 
+                                if (state.offset_.node_->up_matched_)
+                                {
+                                    node->goto_node_ = state.offset_.node_->up_matched_;
+                                    node->goto_locked_path_ = true;
+                                    break;
+                                }
+                                //继续下滑 
+                            }
+                            if (node->goto_content_forward_ == node->depth_)
+                            {
+                                node->goto_node_ = &root_;
+                            }
+                        }
                     }
                 }
             }
@@ -352,7 +410,9 @@ namespace zsummer
             {
                 if (node->child_tree_[i] != NULL)
                 {
-                    s32 ret = BuildGotoStateRecursive(node->child_tree_[i]);
+                    path.push_back(node->child_tree_[i]->node_char_);
+                    s32 ret = BuildGotoStateRecursive(node->child_tree_[i], path);
+                    path.pop_back();
                     if (ret != 0)
                     {
                         LogError() << "has error";
@@ -367,89 +427,17 @@ namespace zsummer
         s32 MatchTree<Ty>::BuildGotoStateRecursive()
         {
             root_.goto_content_forward_ = 1;
-            root_.goto_content_match_offset_ = 0;
             root_.goto_locked_path_ = false;
             root_.goto_node_ = &root_;
-            return BuildGotoStateRecursive(&root_);
-        }
-        template<class Ty>
-        s32 MatchTree<Ty>::BuildGotoState()
-        {
-            std::vector<Node*> nodes;
-            nodes.reserve(node_count_ + 10);
-            nodes.push_back(&root_);
-            for (size_t i = 0; i < nodes.size(); i++)
-            {
-                s32 childs = 0;
-                for (size_t j = 0; j < CHILD_SIZE; j++)
-                {
-                    if (nodes[i]->child_tree_[j] != NULL)
-                    {
-                        nodes.push_back(nodes[i]->child_tree_[j]);
-                        childs++;
-                    }
-                    if (childs >= nodes[i]->childs_)
-                    {
-                        break;
-                    }
-                }
-            }
-
+            root_.goto_locked_path_ = false;
+            root_.up_matched_ = NULL;
+            root_.parent_ = NULL;
+            s32 ret = BuildUpMatchedRecursive(&root_);
             std::string path;
-            std::deque<char> lpath;
-            std::string revert_path;
-            State state;
-            root_.goto_node_ = &root_;
-            root_.goto_content_forward_ = 1;
-            root_.goto_content_match_offset_ = 0;
-            for (size_t i = 1; i < nodes.size(); i++)
-            {
-                Node* node = nodes[i];
-                path.clear();
-                lpath.clear();
-                while (node != NULL)
-                {
-                    lpath.push_front(node->node_char_);
-                    node = node->parent_;
-                }
-                if (lpath.size() <= 1)
-                {
-                    LogError() << "at least has root:'\0' and current node char val.";
-                    return -1;
-                }
-                lpath.pop_front();  //pop root
-                node = nodes[i];
-                node->goto_content_forward_ = 1;
-                node->goto_content_match_offset_ = 0;
-                node->goto_node_ = &root_;
-                lpath.pop_front();
-
-                while (!lpath.empty())
-                {
-                    path.clear();
-                    for (auto iter = lpath.begin(); iter != lpath.end(); ++iter)
-                    {
-                        path.push_back(*iter);
-                    }
-
-                    state.offset_.begin_ = path.c_str();
-                    state.offset_.offset_ = path.c_str();
-                    state.offset_.node_ = &root_;
-                    state.offset_.end_ = path.c_str() + path.length();
-                    MatchPath(state);
-                    if (state.offset_.begin_ != state.offset_.offset_)
-                    {
-                        node->goto_node_ = state.offset_.node_;
-                        node->goto_content_forward_ += 0;
-                        node->goto_content_match_offset_ = (s32)(state.offset_.offset_ - state.offset_.begin_);
-                        break;
-                    }
-                    lpath.pop_front();
-                    node->goto_content_forward_ += 1;
-                }
-            }
-            return 0;
+            ret |= BuildGotoStateRecursive(&root_, path);
+            return ret;
         }
+        
         template<class Ty>
         std::string MatchTree<Ty>::ReadFile(const std::string& file_name)
         {
@@ -520,7 +508,7 @@ namespace zsummer
                 {
                     offset++;
                 }
-                s32 ret = AddPattern(begin, (u32)(offset - begin), 0);
+                s32 ret = AddPattern(begin, (s32)(offset - begin), 0);
                 if (ret != 0)
                 {
                     LogError() << "add pattern error:" << std::string(begin, offset - begin);

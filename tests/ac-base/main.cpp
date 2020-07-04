@@ -17,7 +17,7 @@ using namespace zsummer::matching;
 {\
 	auto v1 = val1;\
 	auto v2 = val2;\
-	if (v1 != v2)\
+	if (v1 != (decltype(v1))v2)\
 	{\
 		LogError() << desc << " expr " << v1 << " not equal " << v2;\
 		return -1;\
@@ -49,7 +49,7 @@ s32 SimpleTest()
 	MatchNode<int>* node = tree.MatchPath("1", 1);
 	AssertMatch(node == NULL, false, "");
 	AssertMatch(node->goto_content_forward_, 1, "");
-	AssertMatch(node->goto_content_match_offset_, 0, "");
+	AssertMatch(node->goto_node_->depth_, 0, "");
 
 	node = tree.MatchPath("1234", 4);
 	MatchNode<int>* goto_node = tree.MatchPath("234", 3);
@@ -59,19 +59,19 @@ s32 SimpleTest()
 	AssertMatch(node->goto_node_, goto_node, "");
 
 	AssertMatch(tree.MatchPath("123", 3)->goto_node_, tree.MatchPath("23", 2), "");
-	AssertMatch(tree.MatchPath("123", 3)->goto_content_match_offset_, 2, "");
+	AssertMatch(tree.MatchPath("123", 3)->goto_node_->depth_, 2, "");
 	AssertMatch(tree.MatchPath("123", 3)->goto_content_forward_, 1, "");
 
 	AssertMatch(tree.MatchPath("1555", 4)->goto_node_, &tree.root_, "");
-	AssertMatch(tree.MatchPath("1555", 4)->goto_content_match_offset_, 0, "");
+	AssertMatch(tree.MatchPath("1555", 4)->goto_node_->depth_, 0, "");
 	AssertMatch(tree.MatchPath("1555", 4)->goto_content_forward_, 4, "");
 
 	AssertMatch(tree.MatchPath("155", 3)->goto_node_, &tree.root_, "");
-	AssertMatch(tree.MatchPath("155", 3)->goto_content_match_offset_, 0, "");
+	AssertMatch(tree.MatchPath("155", 3)->goto_node_->depth_, 0, "");
 	AssertMatch(tree.MatchPath("155", 3)->goto_content_forward_, 3, "");
 
 	AssertMatch(tree.MatchPath("15", 2)->goto_node_, &tree.root_, "");
-	AssertMatch(tree.MatchPath("15", 2)->goto_content_match_offset_, 0, "");
+	AssertMatch(tree.MatchPath("15", 2)->goto_node_->depth_, 0, "");
 
 	
 	std::string content = "1234567";
@@ -170,7 +170,7 @@ int main(int argc, char* argv[])
 			content[i] = 'a' + (rand() % 25);
 		}
 	}
-	LogDebug() << content;
+	//LogDebug() << content;
 	now = Now();
 	if (true)
 	{
@@ -187,8 +187,8 @@ int main(int argc, char* argv[])
 		{
 			str += std::string(s.begin_, s.offset_ - s.begin_) + " ";
 		}
-		LogDebug() << "match results:" << state.results_.size() << "\n" << str;
-		for (size_t i = 0; i < 1000; i++)
+		LogDebug() << "match results:" << state.results_.size();// << "\n" << str;
+		for (size_t i = 0; i < 5000; i++)
 		{
 			MatchTree<int>::State state;
 			state.offset_.begin_ = content.c_str();
@@ -222,9 +222,9 @@ int main(int argc, char* argv[])
 		{
 			str += std::string(s.begin_, s.offset_ - s.begin_) + " ";
 		}
-		LogDebug() << "match results:" << state.results_.size() << "\n" << str;
+		LogDebug() << "match results:" << state.results_.size(); //  << "\n" << str;
 
-		for (size_t i = 0; i < 1000; i++)
+		for (size_t i = 0; i < 5000; i++)
 		{
 			MatchTree<int>::State state;
 			state.offset_.begin_ = content.c_str();
