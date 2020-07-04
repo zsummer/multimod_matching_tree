@@ -71,7 +71,7 @@ namespace zsummer
         struct MatchNode
         {
             bool has_val_;
-            char node_char_;
+            u8 node_char_;
             s32 depth_; //root == 0  
             s32 childs_;
             MatchNode* parent_;
@@ -124,10 +124,8 @@ namespace zsummer
 
             s32 DestroyPatternTree();
 
-
-            s32 MatchContentImpl(State& state, std::function<void(Offset& offset)> callback, bool enable_goto);
-            s32 MatchContent(State& state){return MatchContentImpl(state, NULL, false);}
-            s32 AcMatchContent(State& state){return MatchContentImpl(state, NULL, true);}
+            s32 MatchContent(State& state, std::function<void(Offset& offset)> callback =NULL);
+            s32 AcMatchContent(State& state, std::function<void(Offset& offset)> callback = NULL);
 
             s32 MatchPath(State& state);
 
@@ -165,7 +163,7 @@ namespace zsummer
                     root_.next_alloc_ = child;
                     child->parent_ = node;
                     child->depth_ = node->depth_ + 1;
-                    child->node_char_ = (char)*offset;
+                    child->node_char_ = *offset;
                     use_heap_size_ += sizeof(Node);
                     node_count_++;
                 }
@@ -205,7 +203,7 @@ namespace zsummer
         }
 
         template<class Ty>
-        s32 MatchTree<Ty>::MatchContentImpl(State& state, std::function<void(Offset& offset)> callback, bool enable_goto)
+        s32 MatchTree<Ty>::MatchContent(State& state, std::function<void(Offset& offset)> callback)
         {
             Offset& offset = state.offset_;
             offset.node_ = &root_;
@@ -213,33 +211,20 @@ namespace zsummer
             best_match.node_ = NULL;
             do
             {
-                if (offset.node_->has_val_)
-                {
-                    best_match = offset;
-                }
                 if (offset.offset_ < offset.end_)
                 {
                     if (offset.node_->child_tree_[*(u8*)offset.offset_] != NULL)
                     {
                         offset.node_ = offset.node_->child_tree_[*(u8*)offset.offset_];
                         offset.offset_++;
+                        if (offset.node_->has_val_)
+                        {
+                            best_match = offset;
+                        }
                         continue;
                     }
                 }
-                if (offset.node_->up_matched_ != NULL)
-                {
-                    if (best_match.node_ != NULL)
-                    {
-                        if (offset.node_->up_matched_ != best_match.node_)
-                        {
-                            LogError() << "error";
-                        }
-                    }
-                    best_match = offset;
-                    best_match.node_ = offset.node_->up_matched_;
-                    best_match.offset_ = best_match.begin_+ best_match.node_->depth_;
-                }
-                
+
                 if (best_match.node_ != NULL)
                 {
                     if (callback)
@@ -257,23 +242,58 @@ namespace zsummer
                     continue;
                 }
 
-                if (enable_goto)
-                {
-                    offset.begin_ += offset.node_->goto_content_forward_;
-                    offset.offset_ = offset.begin_ + offset.node_->goto_node_->depth_;
-                    offset.node_ = offset.node_->goto_node_;
-                }
-                else
-                {
-                    offset.begin_ += 1;
-                    offset.offset_ = offset.begin_;
-                    offset.node_ = &root_;
-                }
+                offset.begin_ += 1;
+                offset.offset_ = offset.begin_;
+                offset.node_ = &root_;
 
             } while (offset.offset_ != offset.begin_ || offset.offset_ < offset.end_);
             return 0;
         }
+        template<class Ty>
+        s32 MatchTree<Ty>::AcMatchContent(State& state, std::function<void(Offset& offset)> callback)
+        {
+            Offset& offset = state.offset_;
+            offset.node_ = &root_;
+            Offset best_match;
+            do
+            {
+                if (offset.offset_ < offset.end_)
+                {
+                    if (offset.node_->child_tree_[*(u8*)offset.offset_] != NULL)
+                    {
+                        offset.node_ = offset.node_->child_tree_[*(u8*)offset.offset_];
+                        offset.offset_++;
+                        continue;
+                    }
+                }
+                if (offset.node_->up_matched_ != NULL)
+                {
+                    best_match = offset;
+                    best_match.node_ = offset.node_->up_matched_;
+                    best_match.offset_ = best_match.begin_ + best_match.node_->depth_;
+                    if (callback)
+                    {
+                        callback(best_match);
+                    }
+                    else
+                    {
+                        state.results_.push_back(best_match);
+                    }
+                    offset.begin_ = best_match.offset_;
+                    offset.offset_ = offset.begin_;
+                    offset.node_ = &root_;
+                    best_match.node_ = NULL;
+                    continue;
+                }
 
+ 
+                offset.begin_ += offset.node_->goto_content_forward_;
+                offset.offset_ = offset.begin_ + offset.node_->goto_node_->depth_;
+                offset.node_ = offset.node_->goto_node_;
+
+            } while (offset.offset_ != offset.begin_ || offset.offset_ < offset.end_);
+            return 0;
+        }
         template<class Ty>
         s32 MatchTree<Ty>::MatchPath(State& state)
         {
@@ -347,9 +367,9 @@ namespace zsummer
                 if (!node->goto_locked_path_)
                 {
                     //has match   
-                    if (node->goto_node_->child_tree_[(u8)node->node_char_] != NULL)
+                    if (node->goto_node_->child_tree_[node->node_char_] != NULL)
                     {
-                        node->goto_node_ = node->goto_node_->child_tree_[(u8)node->node_char_];
+                        node->goto_node_ = node->goto_node_->child_tree_[node->node_char_];
                     }
                     //first mis match
                     else if (node->goto_node_ == &root_) //向下滑动
@@ -371,7 +391,7 @@ namespace zsummer
                                 State state;
                                 state.offset_.begin_ = path.c_str() + node->goto_content_forward_;
                                 state.offset_.offset_ = state.offset_.begin_;
-                                state.offset_.end_ = path.c_str() + path.length();
+                                state.offset_.end_ = state.offset_.begin_ + path.size();
                                 state.offset_.node_ = &root_;
                                 s32 ret = MatchPath(state);
                                 if (ret != 0)
@@ -410,7 +430,7 @@ namespace zsummer
             {
                 if (node->child_tree_[i] != NULL)
                 {
-                    path.push_back(node->child_tree_[i]->node_char_);
+                    path.push_back((char)node->child_tree_[i]->node_char_);
                     s32 ret = BuildGotoStateRecursive(node->child_tree_[i], path);
                     path.pop_back();
                     if (ret != 0)

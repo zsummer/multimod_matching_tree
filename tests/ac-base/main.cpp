@@ -171,17 +171,20 @@ int main(int argc, char* argv[])
 		}
 	}
 	//LogDebug() << content;
+	
 	now = Now();
 	if (true)
 	{
 		MatchTree<int> tree;
 		s32 ret = tree.AddPatternFromString(filterworlds.c_str(), ',');
+		LogDebug() << "content size:" << content.size() << ", pattern size:" << tree.node_count_;
 		MatchTree<int>::State state;
 		state.offset_.begin_ = content.c_str();
 		state.offset_.end_ = content.c_str() + content.length();
 		state.offset_.offset_ = state.offset_.begin_;
 		state.offset_.node_ = &tree.root_;
 		ret |= tree.MatchContent(state);
+		LogInfo() << "build & match one:" << Now() - now;
 		std::string str;
 		for (auto& s : state.results_)
 		{
@@ -190,7 +193,6 @@ int main(int argc, char* argv[])
 		LogDebug() << "match results:" << state.results_.size();// << "\n" << str;
 		for (size_t i = 0; i < 5000; i++)
 		{
-			MatchTree<int>::State state;
 			state.offset_.begin_ = content.c_str();
 			state.offset_.end_ = content.c_str() + content.length();
 			state.offset_.offset_ = state.offset_.begin_;
@@ -211,22 +213,22 @@ int main(int argc, char* argv[])
 		MatchTree<int> tree;
 		s32 ret = tree.AddPatternFromString(filterworlds.c_str(), ',');
 		ret |= tree.BuildGotoStateRecursive();
+		LogDebug() << "content size:" << content.size() << ", pattern size:" << tree.node_count_;
 		MatchTree<int>::State state;
 		state.offset_.begin_ = content.c_str();
 		state.offset_.end_ = content.c_str() + content.length();
 		state.offset_.offset_ = state.offset_.begin_;
 		state.offset_.node_ = &tree.root_;
 		ret |= tree.AcMatchContent(state);	
+		LogInfo() << "build & match one:" << Now() - now;
 		std::string str;
 		for (auto& s : state.results_)
 		{
 			str += std::string(s.begin_, s.offset_ - s.begin_) + " ";
 		}
 		LogDebug() << "match results:" << state.results_.size(); //  << "\n" << str;
-
 		for (size_t i = 0; i < 5000; i++)
 		{
-			MatchTree<int>::State state;
 			state.offset_.begin_ = content.c_str();
 			state.offset_.end_ = content.c_str() + content.length();
 			state.offset_.offset_ = state.offset_.begin_;
