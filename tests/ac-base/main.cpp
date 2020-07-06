@@ -191,7 +191,7 @@ int main(int argc, char* argv[])
 			str += std::string(s.begin_, s.offset_ - s.begin_) + " ";
 		}
 		LogDebug() << "match results:" << state.results_.size();// << "\n" << str;
-		for (size_t i = 0; i < 5000; i++)
+		for (size_t i = 0; i < 1000; i++)
 		{
 			state.offset_.begin_ = content.c_str();
 			state.offset_.end_ = content.c_str() + content.length();
@@ -227,7 +227,7 @@ int main(int argc, char* argv[])
 			str += std::string(s.begin_, s.offset_ - s.begin_) + " ";
 		}
 		LogDebug() << "match results:" << state.results_.size(); //  << "\n" << str;
-		for (size_t i = 0; i < 5000; i++)
+		for (size_t i = 0; i < 1000; i++)
 		{
 			state.offset_.begin_ = content.c_str();
 			state.offset_.end_ = content.c_str() + content.length();
