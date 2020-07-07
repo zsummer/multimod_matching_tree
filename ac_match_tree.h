@@ -72,7 +72,7 @@ namespace zsummer
         {
             bool has_val_;
             u8 node_char_;
-            s32 depth_; //root == 0  
+            s32 depth_; 
             s32 childs_;
             MatchNode* parent_;
             MatchNode* next_alloc_;
@@ -82,7 +82,22 @@ namespace zsummer
             s32 goto_locked_path_;      //发生失配后锁定第一个匹配位
             Ty val_;
             struct MatchNode* child_tree_[CHILD_SIZE];
-            static_assert(std::is_arithmetic<Ty>::value, "");
+            void reset()
+            {
+                has_val_ = false;
+                node_char_ = 0;
+                depth_ = 0;
+                childs_ = 0;
+                parent_ = NULL;
+                next_alloc_ = NULL;
+                up_matched_ = NULL;
+                goto_node_ = NULL;
+                goto_content_forward_ = 0;
+                goto_locked_path_ = 0;
+                memset(child_tree_, 0, sizeof(child_tree_));
+                static_assert(sizeof(child_tree_) / sizeof(void*) == CHILD_SIZE, "");
+                static_assert((1ULL << (sizeof(node_char_)*8)) == CHILD_SIZE, "");
+            }
         };
 
         template<typename Ty>
@@ -109,6 +124,7 @@ namespace zsummer
             using Node = MatchNode<Ty>;
             using Offset = MatchOffset<Ty>;
             using State = MatchState<Ty>;
+            using ToString = std::function<std::string(const Ty&)>;
             Node root_;
             s32 use_heap_size_;
             s32 node_count_;
@@ -116,9 +132,18 @@ namespace zsummer
             s32 pattern_max_len_;
             s32 pattern_min_len_;
         public:
+            void reset()
+            {
+                root_.reset();
+                use_heap_size_ = 0;
+                node_count_ = 0;
+                pattern_count_ = 0;
+                pattern_max_len_ = 0;
+                pattern_min_len_ = 0;
+            }
             MatchTree()
             {
-                memset(this, 0, sizeof(MatchTree));
+                reset();
             }
             s32 AddPattern(const char* pattern, s32 pattern_len, Ty val);
 
@@ -126,7 +151,9 @@ namespace zsummer
 
             s32 MatchContent(State& state, std::function<void(Offset& offset)> callback =NULL);
             s32 AcMatchContent(State& state, std::function<void(Offset& offset)> callback = NULL);
-
+            std::string ReplaceContentImpl(const char* content, size_t lenth, bool symbo_bound, bool use_ac, ToString to_string);
+            std::string ReplaceContent(const char* content, size_t lenth, ToString to_string);
+            std::string AcReplaceContent(const char* content, size_t lenth, ToString to_string);
             s32 MatchPath(State& state);
 
             Node* MatchPath(const char* content, size_t len);
@@ -157,7 +184,7 @@ namespace zsummer
                 if (child == NULL)
                 {
                     child = new Node();
-                    memset(child, 0, sizeof(Node));
+                    child->reset();
                     node->childs_++;
                     child->next_alloc_ = root_.next_alloc_;
                     root_.next_alloc_ = child;
@@ -198,7 +225,7 @@ namespace zsummer
                 LogError() << "has memory leak. new node:" << node_count_ << ", destroy count:" << count;
                 return -1;
             }
-            memset(this, 0, sizeof(MatchTree));
+            reset();
             return 0;
         }
 
@@ -294,6 +321,94 @@ namespace zsummer
             } while (offset.offset_ != offset.begin_ || offset.offset_ < offset.end_);
             return 0;
         }
+
+        template<class Ty>
+        std::string MatchTree<Ty>::ReplaceContentImpl(const char* content, size_t lenth, bool symbo_bound, bool use_ac, ToString to_string)
+        {
+            static bool symbo_table[] =
+            {
+                1, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, // 0-15
+                1, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, // 16-31
+                1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 1, 1, 1, 1, // 32-47
+                0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 1, 1, 1, 1, 1, 1, // 48-63   (0-9 :;<=>?)
+                1, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, // 64-79 
+                0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 1, 1, 1, 1, 1, // 80-95 
+                1, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, // 96-111 
+                0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 1, 1, 1, 1, 0, //  -127
+            };
+
+
+
+            State state;
+            state.offset_.begin_ = content;
+            state.offset_.offset_ = content;
+            state.offset_.end_ = content + lenth;
+            state.offset_.node_ = &root_;
+            std::string result;
+            const char* last_begin = content;
+
+            auto bound_proc = [&result, &last_begin, &to_string, symbo_bound, content](Offset& offset)
+            {
+                if (symbo_bound)
+                {
+                    if (offset.begin_ > content)
+                    {
+                        char pre_c = *(offset.begin_ - 1);
+                        if (pre_c < 0)
+                        {
+                            return;
+                        }
+                        if (!symbo_table[(int)pre_c])
+                        {
+                            return;
+                        }
+                    }
+                    if (offset.offset_ < offset.end_)
+                    {
+                        char nex_c = *(offset.offset_);
+                        if (nex_c < 0)
+                        {
+                            return;
+                        }
+                        if (!symbo_table[(int)nex_c])
+                        {
+                            return;
+                        }
+                    }
+                }
+                result += std::string(last_begin, offset.begin_ - last_begin);
+                result += to_string(offset.node_->val_);
+                last_begin = offset.offset_;
+            };
+
+            s32 ret = 0;  
+            if (use_ac)
+            {
+                ret = AcMatchContent(state, bound_proc);
+            }
+            else
+            {
+                ret = MatchContent(state, bound_proc);
+            }
+            if (ret != 0)
+            {
+                LogError() << "ac match has error";
+            }
+            result += std::string(last_begin, state.offset_.end_ - last_begin);
+            return result;
+        }
+        template<class Ty>
+        std::string MatchTree<Ty>::ReplaceContent(const char* content, size_t lenth, ToString to_string)
+        {
+            return ReplaceContentImpl(content, lenth, false, false, to_string);
+        }
+
+        template<class Ty>
+        std::string MatchTree<Ty>::AcReplaceContent(const char* content, size_t lenth, ToString to_string)
+        {
+            return ReplaceContentImpl(content, lenth, false, false, to_string);
+        }
+
         template<class Ty>
         s32 MatchTree<Ty>::MatchPath(State& state)
         {
@@ -505,8 +620,7 @@ namespace zsummer
         {
             const char* begin = content;
             const char* offset = content;
-            bool jump_table[256];
-            memset(jump_table, 0, sizeof(jump_table));
+            bool jump_table[256] = { 0 };
             jump_table[(u8)' '] = true;
             jump_table[(u8)ch] = true;
             jump_table[(u8)'\r'] = true;

@@ -114,21 +114,65 @@ s32 SimpleTest()
 		LogError() << "error destroy";
 		return -10;
 	}
+	LogInfo() << "simple test success.";
 	return 0;
 }
 
-#define TEST_COUNT 10*1000
-int main(int argc, char* argv[])
+s32 ReplaceTest()
 {
-	FNLog::FastStartDebugLogger();
-	LogDebug() << "start log";
-
-	if (SimpleTest() != 0)
+	MatchTree<int> tree;
+	tree.AddPattern("5555", 4, 504);
+	tree.AddPattern("555", 3, 503);
+	tree.AddPattern("55", 2, 502);
+	tree.AddPattern("18888", 5, 188);
+	tree.AddPattern("8888", 4, 888);
+	tree.BuildGotoStateRecursive();
+	std::string content = "房间号5555和房间号555发现了55, 从8188888到888888";
+	std::string new_content = tree.ReplaceContent(content.c_str(), content.length(), 
+		[](const int& n) {char buf[50]; sprintf(buf, "%d", n); return std::string(buf); });
+	std::string new_ac_content = tree.AcReplaceContent(content.c_str(), content.length(),
+		[](const int& n) {char buf[50]; sprintf(buf, "%d", n); return std::string(buf); });
+	if (new_content != new_ac_content)
 	{
-		LogError() << "simple test error.";
+		LogError() << "ac replace and general replace not equal";
 		return -1;
 	}
-	LogInfo() << "simple test success.";
+	if (new_content != "房间号504和房间号503发现了502, 从81888到88888")
+	{
+		LogError() << "not expect result content:" << new_ac_content;
+		return -2;
+	}
+
+	s32 ret = tree.DestroyPatternTree();
+	if (ret != 0)
+	{
+		LogError() << "destroy error";
+		return -3;
+	}
+	tree.AddPattern("F", 1, 8);
+	tree.AddPattern("NFF", 3, 88);
+	content = "NFFF is NFF not FF and not F";
+	tree.BuildGotoStateRecursive();
+	new_content = tree.ReplaceContentImpl(content.c_str(), content.length(), true, false,
+		[](const int& n) {char buf[50]; sprintf(buf, "%d", n); return std::string(buf); });
+	new_ac_content = tree.ReplaceContentImpl(content.c_str(), content.length(), true, true,
+		[](const int& n) {char buf[50]; sprintf(buf, "%d", n); return std::string(buf); });
+	if (new_content != new_ac_content)
+	{
+		LogError() << "ac replace and general replace not equal";
+		return -1;
+	}
+	if (new_content != "NFFF is 88 not FF and not 8")
+	{
+		LogError() << "not expect result content:" << new_ac_content;
+		return -2;
+	}
+	LogInfo() << "replace success:" << new_ac_content;
+	return 0;
+}
+
+s32 StressTest()
+{
 
 	double now = 0.0;
 	std::string filterworlds = MatchTree<int>::ReadFile("filterworlds.txt");
@@ -141,6 +185,7 @@ int main(int argc, char* argv[])
 		if (ret != 0)
 		{
 			LogError() << "has error";
+			return -1;
 		}
 	}
 	LogInfo() << "build & destroy used:" << Now() - now;
@@ -154,6 +199,7 @@ int main(int argc, char* argv[])
 		if (ret != 0)
 		{
 			LogError() << "has error";
+			return -3;
 		}
 	}
 	LogInfo() << "build & goto state & destroy used:" << Now() - now;
@@ -165,13 +211,13 @@ int main(int argc, char* argv[])
 		{
 			content[i] = 'a' + (rand() % 25);
 		}
-		if (content[i] == ',' ||content[i] ==' ' || content[i] == '.')
+		if (content[i] == ',' || content[i] == ' ' || content[i] == '.')
 		{
 			content[i] = 'a' + (rand() % 25);
 		}
 	}
 	//LogDebug() << content;
-	
+
 	now = Now();
 	if (true)
 	{
@@ -204,6 +250,7 @@ int main(int argc, char* argv[])
 		if (ret != 0)
 		{
 			LogError() << "has error";
+			return -5;
 		}
 	}
 	LogInfo() << "build & match & destroy used:" << Now() - now;
@@ -219,7 +266,7 @@ int main(int argc, char* argv[])
 		state.offset_.end_ = content.c_str() + content.length();
 		state.offset_.offset_ = state.offset_.begin_;
 		state.offset_.node_ = &tree.root_;
-		ret |= tree.AcMatchContent(state);	
+		ret |= tree.AcMatchContent(state);
 		LogInfo() << "build & match one:" << Now() - now;
 		std::string str;
 		for (auto& s : state.results_)
@@ -241,10 +288,36 @@ int main(int argc, char* argv[])
 		if (ret != 0)
 		{
 			LogError() << "has error";
+			return -5;
 		}
 
 	}
 	LogInfo() << "build & goto state & ac_match & destroy used:" << Now() - now;
+	return 0;
+}
+
+#define TEST_COUNT 10*1000
+int main(int argc, char* argv[])
+{
+	FNLog::FastStartDebugLogger();
+	LogDebug() << "start log";
+
+	if (SimpleTest() != 0)
+	{
+		LogError() << "simple test error.";
+		return -1;
+	}
+	
+	if (ReplaceTest() != 0)
+	{
+		LogError() << "replace test error";
+		return -2;
+	}
+	if (StressTest() != 0)
+	{
+		LogError() << "stress test error";
+		return -3;
+	}
 
 	return 0;
 }
