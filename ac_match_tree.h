@@ -67,6 +67,10 @@ namespace zsummer
         constexpr static u32 CHILD_SIZE = 1U << (sizeof(u8) * 8);
         static_assert(CHILD_SIZE == 256, "");
 
+
+        /*
+        * 前缀树的节点结构   
+        */
         template<typename Ty>
         struct MatchNode
         {
@@ -76,10 +80,10 @@ namespace zsummer
             s32 childs_;
             MatchNode* parent_;
             MatchNode* next_alloc_;
-            MatchNode* up_matched_; //最大匹配
-            MatchNode* goto_node_;  //失败后跳转到的目标node   
-            s32 goto_content_forward_; //失败后跳转到目标node后, content开始指针滑动字符个数   
-            s32 goto_locked_path_;      //发生失配后锁定第一个匹配位
+            MatchNode* up_matched_; //最大匹配   
+            MatchNode* goto_node_;  //失败后跳转到的目标node     
+            s32 goto_content_forward_; //失败后跳转到目标node后, content开始指针滑动字符个数      
+            s32 goto_locked_path_;      //发生失配后锁定第一个匹配位   
             Ty val_;
             struct MatchNode* child_tree_[CHILD_SIZE];
             void reset()
@@ -100,6 +104,12 @@ namespace zsummer
             }
         };
 
+        /*
+        * 前缀树的节点游标, 记录当前匹配过程中对应的文本范围以及匹配到的节点  
+        * 有效的节点游标中,  begin记录的是第一个匹配的字符, offset是匹配子串结束位置:  
+        * * offset - begin  == node_.depth    
+        * * *(begin -1) == node_.node_char  
+        */
         template<typename Ty>
         struct MatchOffset
         {
@@ -109,6 +119,9 @@ namespace zsummer
             MatchNode<Ty>* node_;
         };
 
+        //匹配状态信息   
+        //对一个长串文本进行连续匹配,并返回所有匹配结果用   
+        //如果用callback的形式则出现匹配时直接callback 并且不会填充results数组   
         template<typename Ty>
         struct MatchState
         {
@@ -117,6 +130,9 @@ namespace zsummer
         };
 
 
+        //前缀树提供朴素的前缀树以及AC自动机两套接口  
+        //AC自动机算法需要再添加完所有pattern后build一次gostate信息    
+        //普通自动机算法可以随时添加pattern不需要build  
         template<class Ty>
         class MatchTree
         {
@@ -167,8 +183,6 @@ namespace zsummer
             static std::string ReadFile(const std::string& file_name);
 
             s32 AddPatternFromString(const char* content, char ch);
-
-
         };
 
         template<class Ty>
