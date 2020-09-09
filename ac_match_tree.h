@@ -47,7 +47,7 @@ THE SOFTWARE.
 typedef int32_t s32;
 typedef uint32_t u32;
 typedef uint8_t u8;
-
+typedef uint16_t u16;
 
 #ifdef USED_FN_LOG
 #include "fn_log.h"
@@ -76,6 +76,7 @@ namespace zsummer
         {
             bool has_val_;
             u8 node_char_;
+            s32 seq_id_;
             s32 depth_; 
             s32 childs_;
             MatchNode* parent_;
@@ -103,6 +104,30 @@ namespace zsummer
                 static_assert((1ULL << (sizeof(node_char_)*8)) == CHILD_SIZE, "");
             }
         };
+
+        template<typename Ty>
+        struct CharState
+        {
+            u8 node_char_;
+            u8 child_count_;
+            u16 child_begin_id_;  
+            u16 text_offset_;  
+            u16 failed_goto_id_;
+            u16 failed_text_offset_;
+            u16 up_closure_id_;  
+            u8 has_val_;
+            Ty val_;
+        };
+
+
+        template<typename Ty>
+        struct ZipStateMachine
+        {
+            u32 node_size_;
+            CharState<Ty> nodes_[1]; //root
+        };
+
+
 
         /*
         * 前缀树的节点游标, 记录当前匹配过程中对应的文本范围以及匹配到的节点  
@@ -144,9 +169,11 @@ namespace zsummer
             Node root_;
             s32 use_heap_size_;
             s32 node_count_;
+            s32 seq_count_;
             s32 pattern_count_;
             s32 pattern_max_len_;
             s32 pattern_min_len_;
+            ZipStateMachine<Ty> *zip_states_;
         public:
             void reset()
             {
@@ -156,6 +183,8 @@ namespace zsummer
                 pattern_count_ = 0;
                 pattern_max_len_ = 0;
                 pattern_min_len_ = 0;
+                seq_count_ = 0;
+                zip_states_ = NULL;
             }
             MatchTree()
             {
@@ -167,6 +196,7 @@ namespace zsummer
 
             s32 MatchContent(State& state, std::function<void(Offset& offset)> callback =NULL);
             s32 AcMatchContent(State& state, std::function<void(Offset& offset)> callback = NULL);
+            s32 AcZipMatchContent(State& state, std::function<void(Offset& offset)> callback = NULL);
             std::string ReplaceContentImpl(const char* content, size_t lenth, bool symbo_bound, bool use_ac, ToString to_string);
             std::string ReplaceContent(const char* content, size_t lenth, ToString to_string);
             std::string AcReplaceContent(const char* content, size_t lenth, ToString to_string);
@@ -178,6 +208,9 @@ namespace zsummer
 
             s32 BuildGotoStateRecursive(Node*, std::string& path);
             s32 BuildGotoStateRecursive();
+
+            s32 BuildZipState(s32& cur_index, Node* node);
+            s32 BuildZipState();
 
 
             static std::string ReadFile(const std::string& file_name);
@@ -238,6 +271,11 @@ namespace zsummer
             {
                 LogError() << "has memory leak. new node:" << node_count_ << ", destroy count:" << count;
                 return -1;
+            }
+            if (zip_states_ != NULL)
+            {
+                delete[](char*)zip_states_;
+                zip_states_ = NULL;
             }
             reset();
             return 0;
@@ -333,6 +371,82 @@ namespace zsummer
                 offset.node_ = offset.node_->goto_node_;
 
             } while (offset.offset_ != offset.begin_ || offset.offset_ < offset.end_);
+            return 0;
+        }
+
+        template<class Ty>
+        s32 MatchTree<Ty>::AcZipMatchContent(State& state, std::function<void(Offset& offset)> callback)
+        {
+            Offset& offset = state.offset_;
+            s32 index = 0;
+            while (offset.offset_ < offset.end_)
+            {
+                CharState<Ty>& node = zip_states_->nodes_[index];
+                bool has_match = false;
+                if (true)
+                {
+                    s32 count = node.child_count_;
+                    s32 step;
+                    s32 child_index = node.child_begin_id_;
+                    while (count > 0)
+                    {
+                        step = count / 2;
+                        if ((u8)*offset.offset_ < zip_states_->nodes_[child_index + step].node_char_)
+                        {
+                            count = step;
+                        }
+                        else 
+                        {
+                            child_index += step+1;
+                            count -= step+1;
+                        }
+                    }
+                    if (child_index < node.child_begin_id_ + node.child_count_)
+                    {
+                        index = child_index;
+                        offset.offset_++;
+                        has_match = true;
+                    }
+                }
+                if (false)
+                {
+                    for (s32 i = node.child_begin_id_; i < node.child_begin_id_ + node.child_count_; i++)
+                    {
+                        CharState<Ty>& child = zip_states_->nodes_[i];
+                        if (child.node_char_ == *offset.offset_)
+                        {
+                            index = i;
+                            offset.offset_++;
+                            has_match = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!has_match)
+                {
+                    if (node.up_closure_id_ == 0)
+                    {
+                        offset.begin_ += node.failed_text_offset_;
+                        offset.offset_ = offset.begin_ + node.failed_text_offset_;
+                        index = node.failed_goto_id_;
+                    }
+                    else
+                    {
+                        //matched
+                        index = node.up_closure_id_;
+                        CharState<Ty>& node = zip_states_->nodes_[index];
+                        offset.offset_ = offset.begin_ + node.text_offset_;
+
+
+                        offset.begin_ += node.text_offset_;
+                        offset.offset_ = offset.begin_;
+                        index = 0;
+                    }
+                }
+
+            }
+
             return 0;
         }
 
@@ -465,6 +579,16 @@ namespace zsummer
             {
                 node->up_matched_ = (node->parent_) ? node->parent_->up_matched_ : NULL;
             }
+
+
+            for (size_t i = 0; i < CHILD_SIZE; i++)
+            {
+                if (node->child_tree_[i] != NULL)
+                {
+                    node->child_tree_[i]->seq_id_ = seq_count_++;
+                }
+            }
+
             for (size_t i = 0; i < CHILD_SIZE; i++)
             {
                 if (node->child_tree_[i] != NULL)
@@ -581,9 +705,14 @@ namespace zsummer
             root_.goto_locked_path_ = false;
             root_.up_matched_ = NULL;
             root_.parent_ = NULL;
+            root_.seq_id_ = seq_count_++;
             s32 ret = BuildUpMatchedRecursive(&root_);
             std::string path;
             ret |= BuildGotoStateRecursive(&root_, path);
+            if (ret == 0)
+            {
+                ret |= BuildZipState();
+            }
             return ret;
         }
         
@@ -668,6 +797,84 @@ namespace zsummer
             return 0;
         }
 
+        template<class Ty>
+        s32 MatchTree<Ty>::BuildZipState(s32& cur_index, Node* node)
+        {
+            if (cur_index > zip_states_->node_size_)
+            {
+                return -1;
+            }
+            if (cur_index + node->childs_ > zip_states_->node_size_)
+            {
+                return -2;
+            }
+            CharState<Ty>* state = &zip_states_->nodes_[node->seq_id_];
+            state->child_count_ = node->childs_;
+            state->child_begin_id_ = cur_index;
+            cur_index += node->childs_;
+
+            for (size_t i = 0; i < 256; i++)
+            {
+                Node* child = node->child_tree_[i];
+                if (child)
+                {
+                    CharState<Ty>* state = &zip_states_->nodes_[child->seq_id_];
+                    state->failed_goto_id_ = child->goto_node_->seq_id_;
+                    state->failed_text_offset_ = child->goto_content_forward_;
+                    state->node_char_ = child->node_char_;
+                    state->text_offset_ = child->depth_;
+                    state->up_closure_id_ = child->up_matched_ == NULL ? 0 : child->up_matched_->seq_id_;
+                    state->val_ = child->val_;
+                    state->has_val_ = child->has_val_;
+                }
+            }
+            for (size_t i = 0; i < 256; i++)
+            {
+                Node* child = node->child_tree_[i];
+                if (child)
+                {
+                    s32 ret = BuildZipState(cur_index, child);
+                    if (ret != 0)
+                    {
+                        return ret;
+                    }
+                }
+            }
+            return 0;
+        }
+
+        template<class Ty>
+        s32 MatchTree<Ty>::BuildZipState()
+        {
+            if (zip_states_ != NULL)
+            {
+                return -1;
+            }
+            if (seq_count_ <= 0 )
+            {
+                return -2;
+            }
+            u32 zip_bytes = seq_count_ * sizeof(CharState<Ty>) + sizeof(ZipStateMachine<Ty>);
+            char* zip_begin = new char[zip_bytes];
+            zip_states_ = (ZipStateMachine<Ty>*)zip_begin;
+            memset(zip_begin, 0, zip_bytes);
+            zip_states_->node_size_ = seq_count_;
+
+            CharState<Ty>* first = &zip_states_->nodes_[0];
+            first->failed_goto_id_ = 0;
+            first->failed_text_offset_ = 1;
+            first->text_offset_ = 0;
+            first->node_char_ = root_.node_char_;
+            first->up_closure_id_ =0;
+            first->has_val_ = root_.has_val_;
+            first->val_ = root_.val_;
+ 
+
+            s32 index = 1;
+            return BuildZipState(index, &root_);
+        }
+
+        
 
 
     }

@@ -83,9 +83,11 @@ s32 SimpleTest()
 	ms.results_.clear();
 
 	MatchState<int> ms2 = ms;
+	MatchState<int> ms3 = ms;
 	ret = tree.MatchContent(ms);
 	AssertMatch(ret, 0, "");
 	ret = tree.AcMatchContent(ms2);
+	tree.AcZipMatchContent(ms3);
 	AssertMatch(ret, 0, "");
 	AssertMatch(ms.results_.size(), ms2.results_.size(), "");
 	AssertMatch(ms.results_.size(), 1, "");
@@ -98,9 +100,12 @@ s32 SimpleTest()
 	ms.results_.clear();
 
 	ms2 = ms;
+	ms3 = ms;
+
 	ret = tree.MatchContent(ms);
 	AssertMatch(ret, 0, "");
 	ret = tree.AcMatchContent(ms2);
+	tree.AcZipMatchContent(ms3);
 	AssertMatch(ret, 0, "");
 	AssertMatch(ms.results_.size(), ms2.results_.size(), "");
 	AssertMatch(ms.results_.size(), 1, "");
@@ -266,6 +271,7 @@ s32 StressTest()
 		state.offset_.end_ = content.c_str() + content.length();
 		state.offset_.offset_ = state.offset_.begin_;
 		state.offset_.node_ = &tree.root_;
+		auto state2 = state;
 		ret |= tree.AcMatchContent(state);
 		LogInfo() << "build & match one:" << Now() - now;
 		std::string str;
@@ -293,6 +299,46 @@ s32 StressTest()
 
 	}
 	LogInfo() << "build & goto state & ac_match & destroy used:" << Now() - now;
+
+	now = Now();
+	if (true)
+	{
+		MatchTree<int> tree;
+		s32 ret = tree.AddPatternFromString(filterworlds.c_str(), ',');
+		ret |= tree.BuildGotoStateRecursive();
+		LogDebug() << "content size:" << content.size() << ", pattern size:" << tree.node_count_;
+		MatchTree<int>::State state;
+		state.offset_.begin_ = content.c_str();
+		state.offset_.end_ = content.c_str() + content.length();
+		state.offset_.offset_ = state.offset_.begin_;
+		state.offset_.node_ = &tree.root_;
+		ret |= tree.AcZipMatchContent(state);
+		LogInfo() << "build & match one:" << Now() - now;
+		std::string str;
+		for (auto& s : state.results_)
+		{
+			str += std::string(s.begin_, s.offset_ - s.begin_) + " ";
+		}
+		LogDebug() << "match results:" << state.results_.size(); //  << "\n" << str;
+		for (size_t i = 0; i < 1000; i++)
+		{
+			state.offset_.begin_ = content.c_str();
+			state.offset_.end_ = content.c_str() + content.length();
+			state.offset_.offset_ = state.offset_.begin_;
+			state.offset_.node_ = &tree.root_;
+			state.results_.clear();
+			ret |= tree.AcZipMatchContent(state);
+		}
+
+		ret |= tree.DestroyPatternTree();
+		if (ret != 0)
+		{
+			LogError() << "has error";
+			return -5;
+		}
+
+	}
+	LogInfo() << "build & goto state & ac_zip_match & destroy used:" << Now() - now;
 	return 0;
 }
 
